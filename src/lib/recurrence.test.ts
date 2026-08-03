@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getNextOccurrence, normalizeLegacyRepeatRule } from "./recurrence";
+import {
+  getNextOccurrence,
+  getOccurrencesInRange,
+  normalizeLegacyRepeatRule,
+} from "./recurrence";
 describe("recurrence", () => {
   it("moves every 2 days", () =>
     expect(
@@ -43,4 +47,31 @@ describe("recurrence", () => {
       interval: 1,
       frequency: "week",
     }));
+  it("generates only requested every-two-day occurrences", () => {
+    const dates = getOccurrencesInRange(
+      "2026-08-03T12:00:00.000Z",
+      new Date("2026-08-01T00:00:00.000Z"),
+      new Date("2026-08-10T23:59:59.000Z"),
+      { enabled: true, interval: 2, frequency: "day", end: { type: "never" } },
+    );
+    expect(dates.map((date) => date.toISOString().slice(0, 10))).toEqual([
+      "2026-08-03",
+      "2026-08-05",
+      "2026-08-07",
+      "2026-08-09",
+    ]);
+  });
+  it("crosses a year boundary without expanding storage", () => {
+    const dates = getOccurrencesInRange(
+      "2026-12-31T12:00:00.000Z",
+      new Date("2027-01-01T00:00:00.000Z"),
+      new Date("2027-01-10T23:59:59.000Z"),
+      { enabled: true, interval: 3, frequency: "day", end: { type: "never" } },
+    );
+    expect(dates.map((date) => date.toISOString().slice(0, 10))).toEqual([
+      "2027-01-03",
+      "2027-01-06",
+      "2027-01-09",
+    ]);
+  });
 });

@@ -564,6 +564,58 @@ main {
   padding: 7px;
   font-size: 16px;
 }
+.category-select {
+  position: relative;
+  min-width: 0;
+}
+.category-select-trigger,
+.category-select-options button {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 2px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--fg);
+  padding: 8px 10px;
+  text-align: left;
+}
+.category-select-chevron {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--fg-muted);
+}
+.category-select-trigger span,
+.category-select-options span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.category-select-options {
+  position: absolute;
+  z-index: 12;
+  top: calc(100% + 4px);
+  width: 100%;
+  max-height: 242px;
+  overflow: auto;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  box-shadow: 4px 4px 0 var(--shadow);
+}
+.category-select-options button {
+  border-width: 0 0 1px;
+}
+.category-select-options button[aria-selected="true"] {
+  background: var(--muted);
+  font-weight: 700;
+}
+.category-select-options button:hover,
+.category-select-options button:focus-visible,
+.category-select-trigger:hover {
+  background: var(--muted);
+}
 .calendar-form-backdrop {
   align-items: end;
   padding: 0;
@@ -574,6 +626,9 @@ main {
   overflow: auto;
   margin: 0;
   padding-bottom: calc(20px + env(safe-area-inset-bottom));
+}
+body.modal-open {
+  overflow: hidden;
 }
 .calendar-form-dialog .form-layout {
   margin-top: 14px;
@@ -1158,6 +1213,22 @@ main {
   .sidebar-toggle {
     flex: 0 0 auto;
   }
+  .sidebar-toggle.icon-button {
+    min-width: 44px;
+    min-height: 44px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--fg-muted);
+  }
+  .sidebar-toggle.icon-button:hover {
+    background: var(--muted);
+    color: var(--fg);
+    transform: none;
+  }
+  .sidebar-toggle.icon-button:active {
+    transform: translateY(1px);
+  }
   .sidebar-collapsed .sidebar {
     padding: 26px 12px;
   }
@@ -1265,7 +1336,7 @@ main {
     grid-template-columns: repeat(4, 1fr);
   }
   .calendar-layout {
-    grid-template-columns: minmax(450px, 1.35fr) minmax(250px, 0.8fr);
+    grid-template-columns: minmax(0, 1.7fr) minmax(270px, 0.8fr);
   }
   .form-grid {
     grid-template-columns: 1fr 1fr;
@@ -1284,6 +1355,41 @@ main {
   }
   .filters {
     grid-template-columns: 1.5fr 1fr 1fr;
+  }
+}
+@media (min-width: 1024px) {
+  .calendar-layout {
+    grid-template-columns: minmax(0, 2.05fr) minmax(300px, 0.95fr);
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .month-grid button {
+    min-height: clamp(92px, 8vw, 120px);
+    font-size: 1.05rem;
+  }
+  .month-grid i {
+    width: 8px;
+    height: 8px;
+    margin-top: 5px;
+  }
+  .calendar-form-backdrop {
+    align-items: center;
+    padding: 32px;
+  }
+  .calendar-form-dialog {
+    width: min(960px, calc(100vw - 64px));
+    max-height: calc(100dvh - 64px);
+    margin: 0;
+    padding: 24px;
+    overflow: hidden;
+  }
+  .calendar-form-dialog .form-layout {
+    min-height: 0;
+    overflow: auto;
+    padding-right: 4px;
+  }
+  .calendar-form-dialog .form-actions {
+    padding: 12px 0;
   }
 }
 @media (prefers-color-scheme: dark) {

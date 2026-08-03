@@ -5,6 +5,8 @@ import {
   addYears,
   isAfter,
   parseISO,
+  format,
+  isBefore,
 } from "date-fns";
 import type { RecurrenceFrequency, RecurrenceRule, RepeatType } from "./types";
 
@@ -109,4 +111,39 @@ export function formatRecurrenceRule(rule: RecurrenceRule): string {
           ? "month"
           : "year";
   return `Every ${rule.interval} ${unit}${rule.interval === 1 ? "" : "s"}`;
+}
+
+export function getOccurrenceKey(seriesId: string, date: Date): string {
+  return `${seriesId}:${format(date, "yyyy-MM-dd")}`;
+}
+
+export function getOccurrencesInRange(
+  startAt: string,
+  rangeStart: Date,
+  rangeEnd: Date,
+  rule: RecurrenceRule,
+  stoppedAt?: string,
+): Date[] {
+  if (!rule.enabled || validateRecurrenceRule(rule)) return [];
+  const results: Date[] = [];
+  const limit = 10000;
+  let current = parseISO(startAt);
+  const stopped = stoppedAt ? parseISO(stoppedAt) : undefined;
+  for (
+    let count = 0;
+    count < limit && !isAfter(current, rangeEnd);
+    count += 1
+  ) {
+    if (
+      !isBefore(current, rangeStart) &&
+      (!stopped || !isAfter(current, stopped))
+    )
+      results.push(current);
+    // `count + 1` includes the current occurrence before considering whether
+    // an after-occurrences rule permits another one.
+    const next = getNextOccurrence(current.toISOString(), rule, count + 1);
+    if (!next || +next === +current) break;
+    current = next;
+  }
+  return results;
 }

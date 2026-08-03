@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { addYears } from "date-fns";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Bell,
@@ -29,6 +30,7 @@ import {
 } from "@/lib/filters";
 import { categoryRepository, countdownRepository } from "@/lib/repository";
 import type { Category, Countdown } from "@/lib/types";
+import { withVirtualOccurrences } from "@/lib/occurrences";
 const parseFilters = (params: URLSearchParams): DashboardFilters => ({
   categoryIds: params.get("categories")?.split(",").filter(Boolean) ?? [],
   importance:
@@ -54,9 +56,13 @@ function DashboardContent() {
     if (next.importance !== "all") query.set("importance", next.importance);
     router.replace(query.size ? `${pathname}?${query}` : pathname);
   };
+  const calendarAwareItems = useMemo(
+    () => withVirtualOccurrences(items, new Date(), addYears(new Date(), 1)),
+    [items],
+  );
   const active = useMemo(
-    () => filterCountdowns(items, filters).sort(byDue),
-    [items, filters],
+    () => filterCountdowns(calendarAwareItems, filters).sort(byDue),
+    [calendarAwareItems, filters],
   );
   const counts = {
     today: active.filter((x) => statusFor(x) === "due-today").length,

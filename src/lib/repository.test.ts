@@ -75,6 +75,19 @@ describe("countdown repository", () => {
     countdownRepository.complete(saved.id);
     expect(countdownRepository.list()).toHaveLength(1);
   });
+  it("materializes an opened virtual occurrence once without pre-generating a series", () => {
+    const saved = countdownRepository.save(input());
+    const first = countdownRepository.materializeOccurrence(
+      saved.id,
+      "2026-01-12T12:00:00.000Z",
+    );
+    const second = countdownRepository.materializeOccurrence(
+      saved.id,
+      "2026-01-12T12:00:00.000Z",
+    );
+    expect(first?.id).toBe(second?.id);
+    expect(countdownRepository.list()).toHaveLength(2);
+  });
   it("exports and imports recurrence, icons, and new themes", () => {
     const saved = countdownRepository.save({
       ...input(),

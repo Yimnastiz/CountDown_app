@@ -12,6 +12,7 @@ import { incompleteStatusFor } from "./date";
 import { getNextOccurrence } from "./recurrence";
 import { createId } from "./id";
 import { normalizeCategory, sortCategories } from "./categories";
+import { format } from "date-fns";
 const keys = {
   countdowns: "countdown-app.countdowns",
   categories: "countdown-app.categories",
@@ -139,10 +140,11 @@ export const countdownRepository = {
     const item = countdownRepository.get(id);
     if (!item) return;
     const stoppedAt = new Date().toISOString();
+    const seriesId = item.seriesId ?? item.id;
     write(
       keys.countdowns,
       countdownRepository.list().map((value) =>
-        value.id === id || value.id === item.nextOccurrenceId
+        value.id === seriesId || value.seriesId === seriesId
           ? {
               ...value,
               recurrence: { ...value.recurrence, enabled: false },
@@ -153,6 +155,37 @@ export const countdownRepository = {
           : value,
       ),
     );
+  },
+  /** Stores a preview only if the user opens that individual occurrence. */
+  materializeOccurrence: (rootId: string, dueAt: string) => {
+    const all = countdownRepository.list();
+    const root = all.find((item) => item.id === rootId);
+    if (!root) return;
+    const seriesId = root.seriesId ?? root.id;
+    const date = format(new Date(dueAt), "yyyy-MM-dd");
+    const existing = all.find(
+      (item) =>
+        (item.seriesId ?? item.id) === seriesId &&
+        format(new Date(item.dueAt), "yyyy-MM-dd") === date,
+    );
+    if (existing) return existing;
+    const now = new Date().toISOString();
+    const occurrence: Countdown = {
+      ...root,
+      id: createId(),
+      dueAt,
+      seriesId,
+      sourceOccurrenceId: root.id,
+      nextOccurrenceId: undefined,
+      status: incompleteStatusFor({ dueAt }),
+      completedAt: undefined,
+      archivedAt: undefined,
+      isVirtualOccurrence: undefined,
+      createdAt: now,
+      updatedAt: now,
+    };
+    write(keys.countdowns, [...all, occurrence]);
+    return occurrence;
   },
   remove: (id: string) =>
     write(

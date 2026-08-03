@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { Plus, Repeat2, X } from "lucide-react";
+import { ChevronDown, Plus, Repeat2, X } from "lucide-react";
 import { AppShell } from "./shell";
 import { FormField, PixelButton, PixelCard } from "./ui";
 import {
@@ -18,6 +18,7 @@ import type {
 } from "@/lib/types";
 import { disabledRecurrence, validateRecurrenceRule } from "@/lib/recurrence";
 import { parseLocalDateParam } from "@/lib/calendar";
+import { CategoryIcon } from "@/lib/icons";
 const repeats: RepeatType[] = [
   "never",
   "daily",
@@ -26,7 +27,7 @@ const repeats: RepeatType[] = [
   "yearly",
   "custom",
 ];
-const quickReminders = [0, 1, 3, 7, 14, 30];
+const quickReminders = [0, 1];
 const labelForReminder = (days: number) =>
   days === 0 ? "Same day" : `${days} day${days === 1 ? "" : "s"} before`;
 type FormMode = "page" | "modal";
@@ -49,6 +50,7 @@ export function CountdownForm({
   const [error, setError] = useState("");
   const [showCustom, setShowCustom] = useState(false);
   const [customReminder, setCustomReminder] = useState("");
+  const [categoryOpen, setCategoryOpen] = useState(false);
   const initial = useMemo(
     () =>
       existing ?? {
@@ -91,8 +93,8 @@ export function CountdownForm({
     );
   const addCustom = () => {
     const days = Number(customReminder);
-    if (!Number.isInteger(days) || days < 0) {
-      setError("Custom reminder must be a whole number of 0 or more days.");
+    if (!Number.isInteger(days) || days < 0 || days > 3650) {
+      setError("Custom reminder must be a whole number from 0 to 3650 days.");
       return;
     }
     change(
@@ -222,19 +224,80 @@ export function CountdownForm({
               placeholder="Optional short detail"
             />
           </FormField>
-          <FormField label="Category">
-            <select
-              id="category"
-              value={form.categoryId}
-              onChange={(e) => change("categoryId", e.target.value)}
-            >
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </FormField>
+          <div className="field category-field">
+            <span>Category</span>
+            <div className="category-select">
+              <button
+                type="button"
+                className="category-select-trigger"
+                aria-haspopup="listbox"
+                aria-expanded={categoryOpen}
+                aria-controls="category-options"
+                onClick={() => setCategoryOpen((open) => !open)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") setCategoryOpen(false);
+                  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                    event.preventDefault();
+                    const index = categories.findIndex(
+                      (category) => category.id === form.categoryId,
+                    );
+                    const next =
+                      categories[
+                        (index +
+                          (event.key === "ArrowDown"
+                            ? 1
+                            : categories.length - 1)) %
+                          categories.length
+                      ];
+                    if (next) change("categoryId", next.id);
+                  }
+                }}
+              >
+                <CategoryIcon
+                  name={
+                    categories.find(
+                      (category) => category.id === form.categoryId,
+                    )?.icon
+                  }
+                  size={18}
+                />
+                <span>
+                  {categories.find(
+                    (category) => category.id === form.categoryId,
+                  )?.name ?? "Choose category"}
+                </span>
+                <ChevronDown
+                  className="category-select-chevron"
+                  size={18}
+                  aria-hidden="true"
+                />
+              </button>
+              {categoryOpen && (
+                <div
+                  id="category-options"
+                  className="category-select-options"
+                  role="listbox"
+                  aria-label="Category"
+                >
+                  {categories.map((category) => (
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={category.id === form.categoryId}
+                      key={category.id}
+                      onClick={() => {
+                        change("categoryId", category.id);
+                        setCategoryOpen(false);
+                      }}
+                    >
+                      <CategoryIcon name={category.icon} size={18} />
+                      <span>{category.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
           <div className="field reminder-field">
             <span>Reminder days before</span>
             <div
@@ -272,6 +335,7 @@ export function CountdownForm({
                   type="number"
                   inputMode="numeric"
                   min="0"
+                  max="3650"
                   step="1"
                   value={customReminder}
                   onChange={(e) => setCustomReminder(e.target.value)}

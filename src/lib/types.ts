@@ -34,6 +34,7 @@ export interface Countdown {
   sourceOccurrenceId?: string;
   nextOccurrenceId?: string;
   recurrenceStoppedAt?: string;
+  isVirtualOccurrence?: boolean;
   createdAt: string;
   updatedAt: string;
 }

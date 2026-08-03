@@ -29,6 +29,7 @@ import {
   sortCalendarDayItems,
 } from "@/lib/calendar";
 import type { Category, Countdown } from "@/lib/types";
+import { withVirtualOccurrences } from "@/lib/occurrences";
 export default function CalendarPage() {
   const [month, setMonth] = useState(new Date());
   const [selected, setSelected] = useState(new Date());
@@ -40,6 +41,7 @@ export default function CalendarPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [feedback, setFeedback] = useState("");
   const addButton = useRef<HTMLButtonElement>(null);
+  const formDialog = useRef<HTMLElement>(null);
   useEffect(() => {
     setItems(countdownRepository.list());
     setCats(categoryRepository.list());
@@ -52,8 +54,12 @@ export default function CalendarPage() {
       }),
     [month],
   );
+  const displayItems = useMemo(
+    () => withVirtualOccurrences(items, days[0], days[days.length - 1]),
+    [items, days],
+  );
   const agenda = sortCalendarDayItems(
-    items.filter(
+    displayItems.filter(
       (i) => sameDate(i.dueAt, selected) && statusFor(i) !== "archived",
     ),
   );
@@ -66,7 +72,34 @@ export default function CalendarPage() {
       if (event.key === "Escape" && formOpen) closeForm();
     };
     window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
+    document.body.classList.toggle("modal-open", formOpen);
+    return () => {
+      window.removeEventListener("keydown", closeOnEscape);
+      document.body.classList.remove("modal-open");
+    };
+  }, [formOpen]);
+  useEffect(() => {
+    if (!formOpen) return;
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== "Tab" || !formDialog.current) return;
+      const focusable = Array.from(
+        formDialog.current.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href]",
+        ),
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", trapFocus);
+    return () => window.removeEventListener("keydown", trapFocus);
   }, [formOpen]);
   return (
     <AppShell title="Calendar">
@@ -117,7 +150,7 @@ export default function CalendarPage() {
           </div>
           <div className="month-grid">
             {days.map((day) => {
-              const dayItems = items.filter(
+              const dayItems = displayItems.filter(
                 (i) => sameDate(i.dueAt, day) && statusFor(i) !== "completed",
               );
               return (
@@ -154,7 +187,15 @@ export default function CalendarPage() {
                   key={i.id}
                   item={i}
                   categories={cats}
-                  onOpen={() => location.assign(`/countdowns/${i.id}`)}
+                  onOpen={() => {
+                    const opened = i.isVirtualOccurrence
+                      ? countdownRepository.materializeOccurrence(
+                          i.sourceOccurrenceId ?? i.id,
+                          i.dueAt,
+                        )
+                      : i;
+                    if (opened) location.assign(`/countdowns/${opened.id}`);
+                  }}
                 />
               ))}
             </div>
@@ -239,6 +280,7 @@ export default function CalendarPage() {
           role="presentation"
         >
           <section
+            ref={formDialog}
             className="dialog calendar-form-dialog"
             role="dialog"
             aria-modal="true"
