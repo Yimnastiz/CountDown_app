@@ -1,5 +1,18 @@
 import type { Metadata, Viewport } from "next";
+import { Chakra_Petch, Silkscreen } from "next/font/google";
 import "./globals.css";
+const bodyFont = Chakra_Petch({
+  subsets: ["latin", "thai"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-body",
+  display: "swap",
+});
+const displayFont = Silkscreen({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-display",
+  display: "swap",
+});
 export const metadata: Metadata = {
   title: "Count//Down",
   description: "Personal important-day countdowns",
@@ -28,7 +41,9 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body>{children}</body>
+      <body className={`${bodyFont.variable} ${displayFont.variable}`}>
+        {children}
+      </body>
     </html>
   );
 }

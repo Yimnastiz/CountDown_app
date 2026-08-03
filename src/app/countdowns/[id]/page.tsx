@@ -2,7 +2,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Copy, Pencil, Share2, Trash2 } from "lucide-react";
+import {
+  CircleCheck,
+  Copy,
+  Pencil,
+  RotateCcw,
+  Share2,
+  Star,
+  Trash2,
+} from "lucide-react";
 import { AppShell } from "@/components/shell";
 import {
   CategoryBadge,
@@ -13,8 +21,9 @@ import {
   PixelCard,
 } from "@/components/ui";
 import { formatDue, statusFor, timeLeft } from "@/lib/date";
+import { formatRecurrenceRule } from "@/lib/recurrence";
 import { categoryRepository, countdownRepository } from "@/lib/repository";
-import type { Category, Countdown } from "@/lib/types";
+import type { Category, Countdown, CountdownInput } from "@/lib/types";
 export default function Detail() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -22,6 +31,7 @@ export default function Detail() {
   const [cats, setCats] = useState<Category[]>([]);
   const [confirm, setConfirm] = useState(false);
   const [notice, setNotice] = useState("");
+  const [savingCompletion, setSavingCompletion] = useState(false);
   useEffect(() => {
     setItem(countdownRepository.get(id) ?? null);
     setCats(categoryRepository.list());
@@ -39,12 +49,18 @@ export default function Detail() {
       </AppShell>
     );
   const status = statusFor(item);
-  const complete = () => {
-    countdownRepository.patch(id, {
-      status: "completed",
-      completedAt: new Date().toISOString(),
-    });
+  const updateCompletion = (undo = false) => {
+    if (savingCompletion) return;
+    setSavingCompletion(true);
+    if (undo) {
+      countdownRepository.undoCompletion(id);
+      setNotice("Completion undone. The countdown is active again.");
+    } else {
+      countdownRepository.complete(id);
+      setNotice("Marked as completed.");
+    }
     setItem(countdownRepository.get(id) ?? null);
+    setSavingCompletion(false);
   };
   const share = async () => {
     const text = `${item.title} — ${formatDue(item.dueAt, item.allDay)}`;
@@ -58,6 +74,22 @@ export default function Detail() {
       setNotice("Share was cancelled.");
     }
   };
+  const duplicate = () => {
+    const {
+      id: _id,
+      status: _status,
+      createdAt: _createdAt,
+      updatedAt: _updatedAt,
+      completedAt: _completedAt,
+      archivedAt: _archivedAt,
+      ...input
+    } = item;
+    const copy = countdownRepository.save({
+      ...input,
+      title: `${item.title} (copy)`,
+    } as CountdownInput);
+    router.push(`/countdowns/${copy.id}`);
+  };
   return (
     <AppShell
       title="Countdown"
@@ -68,7 +100,7 @@ export default function Detail() {
           className="icon-button"
           aria-label="Edit countdown"
         >
-          <Pencil />
+          <Pencil aria-hidden="true" />
         </Link>
       }
     >
@@ -76,7 +108,9 @@ export default function Detail() {
         <CountdownBadge status={status} />
         <b className="detail-number">{timeLeft(item)}</b>
         <h2>
-          {item.important && "★ "}
+          {item.important && (
+            <Star size={20} fill="currentColor" aria-label="Important" />
+          )}
           {item.title}
         </h2>
         <p>{formatDue(item.dueAt, item.allDay)}</p>
@@ -93,7 +127,7 @@ export default function Detail() {
               : "No reminder"}
           </dd>
           <dt>Repeat</dt>
-          <dd>{item.repeat}</dd>
+          <dd>{formatRecurrenceRule(item.recurrence)}</dd>
           <dt>Created</dt>
           <dd>{formatDue(item.createdAt)}</dd>
           <dt>Updated</dt>
@@ -112,30 +146,37 @@ export default function Detail() {
         </p>
       )}
       <div className="action-grid">
-        {status !== "completed" && (
-          <PixelButton onClick={complete}>Mark completed</PixelButton>
+        {status !== "completed" ? (
+          <PixelButton
+            disabled={savingCompletion}
+            onClick={() => updateCompletion()}
+          >
+            <CircleCheck size={17} aria-hidden="true" />
+            {savingCompletion ? "Saving…" : "Mark as completed"}
+          </PixelButton>
+        ) : (
+          <PixelButton
+            disabled={savingCompletion}
+            onClick={() => updateCompletion(true)}
+          >
+            <RotateCcw size={17} aria-hidden="true" />
+            {savingCompletion ? "Saving…" : "Mark as incomplete"}
+          </PixelButton>
         )}
         <Link className="pixel-link" href={`/countdowns/${id}/edit`}>
           Edit
         </Link>
         <PixelButton onClick={share}>
-          <Share2 size={17} /> Share / Copy
+          <Share2 size={17} aria-hidden="true" />
+          Share / Copy
         </PixelButton>
-        <PixelButton
-          onClick={() => {
-            const copy = countdownRepository.save({
-              ...item,
-              title: `${item.title} (copy)`,
-              dueAt: item.dueAt,
-              status: undefined,
-            } as unknown as import("@/lib/types").CountdownInput);
-            router.push(`/countdowns/${copy.id}`);
-          }}
-        >
-          <Copy size={17} /> Duplicate
+        <PixelButton onClick={duplicate}>
+          <Copy size={17} aria-hidden="true" />
+          Duplicate
         </PixelButton>
         <PixelButton className="danger" onClick={() => setConfirm(true)}>
-          <Trash2 size={17} /> Delete
+          <Trash2 size={17} aria-hidden="true" />
+          Delete
         </PixelButton>
       </div>
       <ConfirmDialog

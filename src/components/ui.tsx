@@ -1,12 +1,21 @@
 "use client";
-import type {
-  ButtonHTMLAttributes,
-  InputHTMLAttributes,
-  ReactNode,
+import {
+  useState,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
 } from "react";
-import { AlertTriangle, CalendarDays, ChevronRight, X } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarDays,
+  ChevronRight,
+  Star,
+  X,
+} from "lucide-react";
 import type { Category, Countdown, CountdownStatus } from "@/lib/types";
 import { formatDue, statusFor, timeLeft } from "@/lib/date";
+import { CategoryIcon } from "@/lib/icons";
+
 export function PixelButton({
   children,
   className = "",
@@ -54,9 +63,8 @@ export function FormField({
   error?: string;
   children: ReactNode;
 }) {
-  const id = label.toLowerCase().replaceAll(" ", "-");
   return (
-    <label className="field" htmlFor={id}>
+    <label className="field">
       <span>{label}</span>
       {children}
       {error && <small role="alert">{error}</small>}
@@ -73,7 +81,8 @@ export function CategoryBadge({ category }: { category?: Category }) {
         } as React.CSSProperties
       }
     >
-      {category?.icon ?? "Tag"} · {category?.name ?? "Uncategorised"}
+      <CategoryIcon name={category?.icon} />
+      {category?.name ?? "Uncategorised"}
     </span>
   );
 }
@@ -87,7 +96,8 @@ export function CountdownBadge({ status }: { status: CountdownStatus }) {
   };
   return (
     <span className={`countdown-badge ${status}`}>
-      {status === "overdue" && <AlertTriangle size={13} />} {text[status]}
+      {status === "overdue" && <AlertTriangle size={13} aria-hidden="true" />}
+      {text[status]}
     </span>
   );
 }
@@ -105,7 +115,9 @@ export function CountdownCard({
     <button className="countdown-card" onClick={onOpen}>
       <div>
         <strong>
-          {item.important && "★ "}
+          {item.important && (
+            <Star size={15} fill="currentColor" aria-label="Important" />
+          )}
           {item.title}
         </strong>
         <span>{formatDue(item.dueAt, item.allDay)}</span>
@@ -116,7 +128,7 @@ export function CountdownCard({
       <div className="card-right">
         <CountdownBadge status={status} />
         <b>{timeLeft(item)}</b>
-        <ChevronRight size={18} />
+        <ChevronRight size={18} aria-hidden="true" />
       </div>
     </button>
   );
@@ -154,7 +166,7 @@ export function ConfirmDialog({
           aria-label="Close dialog"
           onClick={onClose}
         >
-          <X />
+          <X aria-hidden="true" />
         </button>
         <h2 id="dialog-title">{title}</h2>
         <div>{children}</div>
@@ -191,15 +203,13 @@ function ConfirmTyped({
   danger: boolean;
   confirmText: string;
 }) {
-  const [typed, setTyped] = require("react").useState("");
+  const [typed, setTyped] = useState("");
   return (
     <>
       <input
         aria-label={`Type ${value} to confirm`}
         value={typed}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-          setTyped(e.target.value)
-        }
+        onChange={(e) => setTyped(e.target.value)}
         placeholder={`Type ${value}`}
       />
       <div className="dialog-actions">

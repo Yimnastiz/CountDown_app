@@ -7,6 +7,8 @@ import type {
   Countdown,
   CountdownInput,
 } from "./types";
+import { normalizeLegacyRepeatRule } from "./recurrence";
+import { incompleteStatusFor } from "./date";
 const keys = {
   countdowns: "countdown-app.countdowns",
   categories: "countdown-app.categories",
@@ -23,6 +25,12 @@ const read = <T>(key: string, fallback: T): T => {
 };
 const write = <T>(key: string, value: T) =>
   localStorage.setItem(key, JSON.stringify(value));
+const normalizeCountdown = (value: Countdown): Countdown => ({
+  ...value,
+  recurrence: normalizeLegacyRepeatRule(value.repeat, value.recurrence),
+});
+const normalizeCountdowns = (values: Countdown[]) =>
+  values.map(normalizeCountdown);
 export const categoryRepository = {
   list: () => read(keys.categories, defaultCategories),
   save: (item: Category) => {
@@ -41,12 +49,13 @@ export const categoryRepository = {
     ),
 };
 export const countdownRepository = {
-  list: () => read<Countdown[]>(keys.countdowns, []),
+  list: () => normalizeCountdowns(read<Countdown[]>(keys.countdowns, [])),
   get: (id: string) => countdownRepository.list().find((x) => x.id === id),
   save: (input: CountdownInput, id?: string) => {
     const old = id ? countdownRepository.get(id) : undefined;
     const item: Countdown = {
       ...input,
+      recurrence: normalizeLegacyRepeatRule(input.repeat, input.recurrence),
       id: old?.id ?? crypto.randomUUID(),
       status: old?.status ?? "upcoming",
       createdAt: old?.createdAt ?? new Date().toISOString(),
@@ -73,6 +82,17 @@ export const countdownRepository = {
         ),
     );
   },
+  complete: (id: string) =>
+    countdownRepository.patch(id, {
+      status: "completed",
+      completedAt: new Date().toISOString(),
+    }),
+  undoCompletion: (id: string) => {
+    const item = countdownRepository.get(id);
+    if (!item) return;
+    const restored = incompleteStatusFor(item);
+    countdownRepository.patch(id, { status: restored, completedAt: undefined });
+  },
   remove: (id: string) =>
     write(
       keys.countdowns,
@@ -96,7 +116,7 @@ export const settingsRepository = {
 };
 export const backupService = {
   make: (): BackupFile => ({
-    schemaVersion: 1,
+    schemaVersion: 2,
     exportedAt: new Date().toISOString(),
     countdowns: countdownRepository.list(),
     categories: categoryRepository.list(),
@@ -106,20 +126,23 @@ export const backupService = {
     Boolean(
       value &&
       typeof value === "object" &&
-      (value as BackupFile).schemaVersion === 1 &&
+      [1, 2].includes((value as BackupFile).schemaVersion) &&
       Array.isArray((value as BackupFile).countdowns) &&
       Array.isArray((value as BackupFile).categories) &&
       (value as BackupFile).settings,
     ),
   restore: (data: BackupFile, mode: "merge" | "replace") => {
+    const importedCountdowns = normalizeCountdowns(data.countdowns);
     if (mode === "replace") {
-      write(keys.countdowns, data.countdowns);
+      write(keys.countdowns, importedCountdowns);
       write(keys.categories, data.categories);
     } else {
       const current = countdownRepository.list();
       write(keys.countdowns, [
-        ...current.filter((x) => !data.countdowns.some((y) => y.id === x.id)),
-        ...data.countdowns,
+        ...current.filter(
+          (x) => !importedCountdowns.some((y) => y.id === x.id),
+        ),
+        ...importedCountdowns,
       ]);
       const cats = categoryRepository.list();
       write(keys.categories, [

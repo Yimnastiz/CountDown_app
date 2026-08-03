@@ -23,6 +23,7 @@ import {
 } from "@/components/ui";
 import { categoryRepository, countdownRepository } from "@/lib/repository";
 import { byDue, sameDate, statusFor } from "@/lib/date";
+import { isWeekendDate } from "@/lib/calendar";
 import type { Category, Countdown } from "@/lib/types";
 export default function CalendarPage() {
   const [month, setMonth] = useState(new Date());
@@ -53,14 +54,14 @@ export default function CalendarPage() {
               aria-label="Previous month"
               onClick={() => setMonth(subMonths(month, 1))}
             >
-              <ChevronLeft />
+              <ChevronLeft aria-hidden="true" />
             </PixelButton>
             <h2>{format(month, "MMMM yyyy")}</h2>
             <PixelButton
               aria-label="Next month"
               onClick={() => setMonth(addMonths(month, 1))}
             >
-              <ChevronRight />
+              <ChevronRight aria-hidden="true" />
             </PixelButton>
             <PixelButton
               className="today-button"
@@ -73,9 +74,13 @@ export default function CalendarPage() {
             </PixelButton>
           </div>
           <div className="weekdays">
-            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((x) => (
-              <span key={x}>{x}</span>
-            ))}
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
+              (name, index) => (
+                <span key={name} className={index >= 5 ? "weekend" : ""}>
+                  {name}
+                </span>
+              ),
+            )}
           </div>
           <div className="month-grid">
             {days.map((day) => {
@@ -86,7 +91,7 @@ export default function CalendarPage() {
                 <button
                   key={day.toString()}
                   onClick={() => setSelected(day)}
-                  className={`${!isSameMonth(day, month) ? "other-month " : ""}${isSameDay(day, selected) ? "selected" : ""}`}
+                  className={`${!isSameMonth(day, month) ? "other-month " : ""}${isSameDay(day, selected) ? "selected " : ""}${isWeekendDate(day) ? "weekend" : ""}`}
                   aria-label={`Select ${format(day, "d MMMM")}`}
                 >
                   <span>{format(day, "d")}</span>
@@ -132,7 +137,7 @@ export default function CalendarPage() {
           )}
           {items.filter((i) => statusFor(i) === "overdue").length > 0 && (
             <p className="overdue-note">
-              ⚠ {items.filter((i) => statusFor(i) === "overdue").length} overdue
+              Overdue: {items.filter((i) => statusFor(i) === "overdue").length}{" "}
               item(s) remain.
             </p>
           )}

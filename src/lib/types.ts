@@ -2,6 +2,18 @@ export type CountdownStatus =
   "upcoming" | "due-today" | "overdue" | "completed" | "archived";
 export type RepeatType =
   "never" | "daily" | "weekly" | "monthly" | "yearly" | "custom";
+export type RecurrenceFrequency = "day" | "week" | "month" | "year";
+export interface RecurrenceEnd {
+  type: "never" | "on-date" | "after-occurrences";
+  date?: string;
+  occurrences?: number;
+}
+export interface RecurrenceRule {
+  enabled: boolean;
+  interval: number;
+  frequency: RecurrenceFrequency;
+  end: RecurrenceEnd;
+}
 export interface Countdown {
   id: string;
   title: string;
@@ -10,7 +22,9 @@ export interface Countdown {
   allDay: boolean;
   categoryId?: string;
   reminderDays: number[];
-  repeat: RepeatType;
+  /** Legacy field retained to read old localStorage and schema v1 backups. */
+  repeat?: RepeatType;
+  recurrence: RecurrenceRule;
   important: boolean;
   notes?: string;
   status: CountdownStatus;

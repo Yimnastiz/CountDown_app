@@ -2,13 +2,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   CalendarDays,
   CirclePlus,
   History,
   House,
   Settings,
   Tag,
-  ArrowLeft,
+  TimerReset,
 } from "lucide-react";
 import type { ReactNode } from "react";
 const nav = [
@@ -43,7 +44,7 @@ function Nav({ mobile = false }: { mobile?: boolean }) {
             className={`${path === href ? "active" : ""} ${label === "Add" ? "add-link" : ""}`}
             aria-label={label}
           >
-            <Icon size={21} />
+            <Icon size={21} aria-hidden="true" />
             <span>{label}</span>
           </Link>
         ))}
@@ -69,7 +70,7 @@ export function PageHeader({
           aria-label="Go back"
           onClick={() => router.back()}
         >
-          <ArrowLeft />
+          <ArrowLeft aria-hidden="true" />
         </button>
       )}
       <h1>
@@ -96,7 +97,7 @@ export function AppShell({
     <div className="app-shell">
       <aside className="sidebar">
         <Link href="/" className="brand">
-          <span>◼</span> COUNT//DOWN
+          <TimerReset size={22} aria-hidden="true" /> COUNT//DOWN
         </Link>
         <p>Important days, clearly.</p>
         <Nav />

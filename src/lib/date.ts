@@ -9,12 +9,17 @@ import {
 } from "date-fns";
 import type { Countdown, CountdownStatus } from "./types";
 export const asDate = (value: string) => parseISO(value);
-export function statusFor(item: Countdown): CountdownStatus {
-  if (item.status === "completed" || item.status === "archived")
-    return item.status;
+export function incompleteStatusFor(
+  item: Pick<Countdown, "dueAt">,
+): Exclude<CountdownStatus, "completed" | "archived"> {
   const date = asDate(item.dueAt);
   if (isToday(date)) return "due-today";
   return date < startOfDay(new Date()) ? "overdue" : "upcoming";
+}
+export function statusFor(item: Countdown): CountdownStatus {
+  if (item.status === "completed" || item.status === "archived")
+    return item.status;
+  return incompleteStatusFor(item);
 }
 export function timeLeft(item: Countdown) {
   const date = asDate(item.dueAt);

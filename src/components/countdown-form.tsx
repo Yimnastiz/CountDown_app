@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
+import { Repeat2 } from "lucide-react";
 import { AppShell } from "./shell";
 import { FormField, PixelButton, PixelCard } from "./ui";
 import {
@@ -15,6 +16,7 @@ import type {
   CountdownInput,
   RepeatType,
 } from "@/lib/types";
+import { disabledRecurrence, validateRecurrenceRule } from "@/lib/recurrence";
 const repeats: RepeatType[] = [
   "never",
   "daily",
@@ -36,6 +38,7 @@ export function CountdownForm({ existing }: { existing?: Countdown }) {
     categoryId: "personal",
     reminderDays: [7, 1],
     repeat: "never" as RepeatType,
+    recurrence: disabledRecurrence,
     important: false,
     notes: "",
   };
@@ -50,10 +53,65 @@ export function CountdownForm({ existing }: { existing?: Countdown }) {
         reminderDays: settingsRepository.get().defaultReminderDays,
       }));
   }, [existing]);
+  const repeatChoice = !form.recurrence.enabled
+    ? "never"
+    : form.repeat === "custom" || form.recurrence.interval !== 1
+      ? "custom"
+      : form.recurrence.frequency === "day"
+        ? "daily"
+        : form.recurrence.frequency === "week"
+          ? "weekly"
+          : form.recurrence.frequency === "month"
+            ? "monthly"
+            : "yearly";
+  const setRepeat = (value: RepeatType) => {
+    if (value === "never") {
+      setForm((prev) => ({
+        ...prev,
+        repeat: value,
+        recurrence: disabledRecurrence,
+      }));
+      return;
+    }
+    if (value === "custom") {
+      setForm((prev) => ({
+        ...prev,
+        repeat: "custom",
+        recurrence: prev.recurrence.enabled
+          ? prev.recurrence
+          : {
+              enabled: true,
+              interval: 2,
+              frequency: "week",
+              end: { type: "never" },
+            },
+      }));
+      return;
+    }
+    const frequency =
+      value === "daily"
+        ? "day"
+        : value === "weekly"
+          ? "week"
+          : value === "monthly"
+            ? "month"
+            : "year";
+    setForm((prev) => ({
+      ...prev,
+      repeat: value,
+      recurrence: {
+        enabled: true,
+        interval: 1,
+        frequency,
+        end: { type: "never" },
+      },
+    }));
+  };
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!form.title.trim() || !form.dueAt) {
-      setError("Please add a title and due date.");
+    const recurrenceError = validateRecurrenceRule(form.recurrence);
+    if (!form.title.trim() || !form.dueAt || recurrenceError) {
+      setError(recurrenceError ?? "Please add a title and due date.");
       return;
     }
     setBusy(true);
@@ -150,18 +208,65 @@ export function CountdownForm({ existing }: { existing?: Countdown }) {
             <FormField label="Repeat">
               <select
                 id="repeat"
-                value={form.repeat}
-                onChange={(e) => change("repeat", e.target.value)}
+                value={repeatChoice}
+                onChange={(e) => setRepeat(e.target.value as RepeatType)}
               >
                 {repeats.map((r) => (
                   <option key={r} value={r}>
-                    {r === "custom"
-                      ? "Custom (coming soon)"
+                    {r === "never"
+                      ? "Does not repeat"
                       : r[0].toUpperCase() + r.slice(1)}
                   </option>
                 ))}
               </select>
             </FormField>
+            {repeatChoice === "custom" && (
+              <div
+                className="custom-recurrence"
+                aria-labelledby="repeat-custom-label"
+              >
+                <span id="repeat-custom-label">
+                  <Repeat2 size={16} aria-hidden="true" /> Repeat every
+                </span>
+                <input
+                  aria-label="Repeat interval"
+                  type="number"
+                  min="1"
+                  max="999"
+                  step="1"
+                  value={form.recurrence.interval}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      recurrence: {
+                        ...prev.recurrence,
+                        interval: Number(e.target.value),
+                      },
+                    }))
+                  }
+                />
+                <select
+                  aria-label="Repeat frequency"
+                  value={form.recurrence.frequency}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      recurrence: {
+                        ...prev.recurrence,
+                        frequency: e.target.value as
+                          "day" | "week" | "month" | "year",
+                      },
+                    }))
+                  }
+                >
+                  <option value="day">Day</option>
+                  <option value="week">Week</option>
+                  <option value="month">Month</option>
+                  <option value="year">Year</option>
+                </select>
+                <small>{`Every ${form.recurrence.interval} ${form.recurrence.frequency}${form.recurrence.interval === 1 ? "" : "s"}`}</small>
+              </div>
+            )}
             <FormField label="Notes">
               <textarea
                 id="notes"
