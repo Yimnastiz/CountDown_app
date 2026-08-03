@@ -3,11 +3,14 @@ import {
   addMonths,
   addWeeks,
   addYears,
+  differenceInCalendarDays,
+  differenceInCalendarMonths,
+  differenceInCalendarYears,
   isAfter,
-  parseISO,
-  format,
   isBefore,
+  parseISO,
 } from "date-fns";
+import { getLocalDateKey, parseLocalDate } from "./date";
 import type { RecurrenceFrequency, RecurrenceRule, RepeatType } from "./types";
 
 export const disabledRecurrence: RecurrenceRule = {
@@ -24,20 +27,25 @@ export function normalizeLegacyRepeatRule(
   if (
     rule &&
     typeof rule.enabled === "boolean" &&
-    rule.frequency &&
+    ["day", "week", "month", "year"].includes(rule.frequency ?? "") &&
     Number.isInteger(rule.interval)
   ) {
     return {
       enabled: rule.enabled,
       interval: Math.max(1, Math.min(999, rule.interval ?? 1)),
-      frequency: rule.frequency,
+      frequency: rule.frequency as RecurrenceFrequency,
       end: rule.end?.type ? rule.end : { type: "never" },
     };
   }
   const frequency: Record<
     Exclude<RepeatType, "never" | "custom">,
     RecurrenceFrequency
-  > = { daily: "day", weekly: "week", monthly: "month", yearly: "year" };
+  > = {
+    daily: "day",
+    weekly: "week",
+    monthly: "month",
+    yearly: "year",
+  };
   if (!repeat || repeat === "never" || repeat === "custom")
     return disabledRecurrence;
   return {
@@ -56,19 +64,30 @@ export function validateRecurrenceRule(
     !Number.isInteger(rule.interval) ||
     rule.interval < 1 ||
     rule.interval > 999
-  )
+  ) {
     return "Repeat interval must be a whole number from 1 to 999.";
+  }
   if (
     rule.end.type === "on-date" &&
-    (!rule.end.date || Number.isNaN(+parseISO(rule.end.date)))
-  )
+    (!rule.end.date || !parseLocalDate(rule.end.date))
+  ) {
     return "Choose a valid repeat end date.";
+  }
   if (
     rule.end.type === "after-occurrences" &&
     (!Number.isInteger(rule.end.occurrences) || (rule.end.occurrences ?? 0) < 1)
-  )
+  ) {
     return "Repeat occurrences must be at least 1.";
+  }
   return undefined;
+}
+
+function addInterval(source: Date, rule: RecurrenceRule, amount = 1): Date {
+  const interval = rule.interval * amount;
+  if (rule.frequency === "day") return addDays(source, interval);
+  if (rule.frequency === "week") return addWeeks(source, interval);
+  if (rule.frequency === "month") return addMonths(source, interval);
+  return addYears(source, interval);
 }
 
 export function getNextOccurrence(
@@ -82,39 +101,41 @@ export function getNextOccurrence(
     completedOccurrences >= (rule.end.occurrences ?? 0)
   )
     return undefined;
-  const source = parseISO(dueAt);
-  const next =
-    rule.frequency === "day"
-      ? addDays(source, rule.interval)
-      : rule.frequency === "week"
-        ? addWeeks(source, rule.interval)
-        : rule.frequency === "month"
-          ? addMonths(source, rule.interval)
-          : addYears(source, rule.interval);
-  if (
-    rule.end.type === "on-date" &&
-    rule.end.date &&
-    isAfter(next, parseISO(rule.end.date))
-  )
-    return undefined;
-  return next;
+  const next = addInterval(parseISO(dueAt), rule);
+  const end =
+    rule.end.type === "on-date"
+      ? parseLocalDate(rule.end.date ?? "")
+      : undefined;
+  return end && getLocalDateKey(next) > getLocalDateKey(end) ? undefined : next;
 }
 
 export function formatRecurrenceRule(rule: RecurrenceRule): string {
   if (!rule.enabled) return "Does not repeat";
-  const unit =
-    rule.frequency === "day"
-      ? "day"
-      : rule.frequency === "week"
-        ? "week"
-        : rule.frequency === "month"
-          ? "month"
-          : "year";
+  const unit = rule.frequency;
   return `Every ${rule.interval} ${unit}${rule.interval === 1 ? "" : "s"}`;
 }
 
-export function getOccurrenceKey(seriesId: string, date: Date): string {
-  return `${seriesId}:${format(date, "yyyy-MM-dd")}`;
+export function getOccurrenceKey(
+  seriesId: string,
+  occurrenceDate: string | Date,
+): string {
+  return `${seriesId}:${typeof occurrenceDate === "string" ? occurrenceDate : getLocalDateKey(occurrenceDate)}`;
+}
+
+function approximateStartIndex(
+  start: Date,
+  rangeStart: Date,
+  rule: RecurrenceRule,
+) {
+  const difference =
+    rule.frequency === "day"
+      ? differenceInCalendarDays(rangeStart, start)
+      : rule.frequency === "week"
+        ? Math.floor(differenceInCalendarDays(rangeStart, start) / 7)
+        : rule.frequency === "month"
+          ? differenceInCalendarMonths(rangeStart, start)
+          : differenceInCalendarYears(rangeStart, start);
+  return Math.max(0, Math.floor(difference / rule.interval) - 1);
 }
 
 export function getOccurrencesInRange(
@@ -124,26 +145,52 @@ export function getOccurrencesInRange(
   rule: RecurrenceRule,
   stoppedAt?: string,
 ): Date[] {
-  if (!rule.enabled || validateRecurrenceRule(rule)) return [];
+  if (
+    !rule.enabled ||
+    validateRecurrenceRule(rule) ||
+    isAfter(rangeStart, rangeEnd)
+  )
+    return [];
+  const start = parseISO(startAt);
+  const maxResults = 500;
+  let index = approximateStartIndex(start, rangeStart, rule);
+  let current = addInterval(start, rule, index);
+  while (index > 0 && isAfter(current, rangeStart)) {
+    index -= 1;
+    current = addInterval(start, rule, index);
+  }
   const results: Date[] = [];
-  const limit = 10000;
-  let current = parseISO(startAt);
-  const stopped = stoppedAt ? parseISO(stoppedAt) : undefined;
-  for (
-    let count = 0;
-    count < limit && !isAfter(current, rangeEnd);
-    count += 1
-  ) {
+  const stoppedDate = stoppedAt ? getLocalDateKey(stoppedAt) : undefined;
+  const endDate = rule.end.type === "on-date" ? rule.end.date : undefined;
+  while (!isAfter(current, rangeEnd) && results.length < maxResults) {
+    const currentDate = getLocalDateKey(current);
+    if (endDate && currentDate > endDate) break;
+    if (stoppedDate && currentDate > stoppedDate) break;
     if (
-      !isBefore(current, rangeStart) &&
-      (!stopped || !isAfter(current, stopped))
+      rule.end.type === "after-occurrences" &&
+      index >= (rule.end.occurrences ?? 0)
     )
-      results.push(current);
-    // `count + 1` includes the current occurrence before considering whether
-    // an after-occurrences rule permits another one.
-    const next = getNextOccurrence(current.toISOString(), rule, count + 1);
-    if (!next || +next === +current) break;
-    current = next;
+      break;
+    if (!isBefore(current, rangeStart)) results.push(current);
+    index += 1;
+    current = addInterval(start, rule, index);
   }
   return results;
+}
+
+export function getNextOccurrences(
+  startAt: string,
+  fromDate: Date,
+  rule: RecurrenceRule,
+  limit = 12,
+  stoppedAt?: string,
+) {
+  const horizon = addYears(fromDate, 10);
+  return getOccurrencesInRange(
+    startAt,
+    fromDate,
+    horizon,
+    rule,
+    stoppedAt,
+  ).slice(0, Math.max(0, limit));
 }

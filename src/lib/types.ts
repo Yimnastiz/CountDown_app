@@ -14,10 +14,21 @@ export interface RecurrenceRule {
   frequency: RecurrenceFrequency;
   end: RecurrenceEnd;
 }
+export type RecurrenceExceptionStatus = "completed" | "skipped" | "cancelled";
+export interface RecurrenceException {
+  occurrenceKey: string;
+  occurrenceDate: string;
+  status: RecurrenceExceptionStatus;
+  completedAt?: string;
+  updatedAt: string;
+}
 export interface Countdown {
   id: string;
   title: string;
   description?: string;
+  /** Date-only storage for all-day countdowns (YYYY-MM-DD). */
+  dueDate?: string;
+  /** Kept for timed countdowns and backwards compatibility with schema v1–3. */
   dueAt: string;
   allDay: boolean;
   categoryId?: string;
@@ -34,6 +45,8 @@ export interface Countdown {
   sourceOccurrenceId?: string;
   nextOccurrenceId?: string;
   recurrenceStoppedAt?: string;
+  recurrenceExceptions?: RecurrenceException[];
+  /** Deprecated legacy fields retained while old local data is normalized. */
   isVirtualOccurrence?: boolean;
   createdAt: string;
   updatedAt: string;

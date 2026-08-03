@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   CircleCheck,
   Copy,
@@ -23,53 +23,64 @@ import {
 } from "@/components/ui";
 import { formatDue, statusFor, timeLeft } from "@/lib/date";
 import { formatRecurrenceRule } from "@/lib/recurrence";
+import {
+  isOccurrenceInSeries,
+  occurrenceDateFor,
+  resolveOccurrence,
+} from "@/lib/occurrences";
 import { categoryRepository, countdownRepository } from "@/lib/repository";
 import type { Category, Countdown, CountdownInput } from "@/lib/types";
+
 export default function Detail() {
   const { id } = useParams<{ id: string }>();
+  const occurrence = useSearchParams().get("occurrence");
   const router = useRouter();
-  const [item, setItem] = useState<Countdown | null | undefined>();
+  const [series, setSeries] = useState<Countdown | null | undefined>();
   const [cats, setCats] = useState<Category[]>([]);
   const [confirm, setConfirm] = useState(false);
   const [stopConfirm, setStopConfirm] = useState(false);
   const [notice, setNotice] = useState("");
   const [savingCompletion, setSavingCompletion] = useState(false);
+
   useEffect(() => {
-    setItem(countdownRepository.get(id) ?? null);
+    setSeries(countdownRepository.get(id) ?? null);
     setCats(categoryRepository.list());
   }, [id]);
-  if (item === undefined) return null;
-  if (!item)
-    return (
-      <AppShell title="Countdown" back>
-        <EmptyState title="Countdown not found">
-          This link no longer points to a countdown.
-          <Link className="pixel-link" href="/">
-            Back to dashboard
-          </Link>
-        </EmptyState>
-      </AppShell>
-    );
+
+  if (series === undefined) return null;
+  if (!series) {
+    return <Missing title="Countdown not found" href="/" />;
+  }
+  const validOccurrence =
+    !occurrence ||
+    (series.recurrence.enabled &&
+      /^\d{4}-\d{2}-\d{2}$/.test(occurrence) &&
+      isOccurrenceInSeries(series, occurrence));
+  if (!validOccurrence)
+    return <Missing title="Occurrence not found" href={`/countdowns/${id}`} />;
+
+  const item = occurrence ? resolveOccurrence(series, occurrence) : series;
   const status = statusFor(item);
-  const updateCompletion = (undo = false) => {
+  const updateCompletion = async (undo = false) => {
     if (savingCompletion) return;
     setSavingCompletion(true);
-    if (undo) {
-      countdownRepository.undoCompletion(id);
-      setNotice("Completion undone. The countdown is active again.");
-    } else {
-      const result = countdownRepository.complete(id);
-      setNotice(
-        result?.next
-          ? `Marked as completed. Next occurrence: ${formatDue(result.next.dueAt, result.next.allDay)}.`
-          : "Marked as completed.",
-      );
+    try {
+      if (undo) {
+        countdownRepository.undoCompletion(series.id, occurrence ?? undefined);
+        setNotice("Completion undone. This occurrence is active again.");
+      } else {
+        countdownRepository.complete(series.id, occurrence ?? undefined);
+        setNotice("Marked as completed.");
+      }
+      setSeries(countdownRepository.get(series.id) ?? null);
+    } catch {
+      setNotice("We could not save that change. Please try again.");
+    } finally {
+      setSavingCompletion(false);
     }
-    setItem(countdownRepository.get(id) ?? null);
-    setSavingCompletion(false);
   };
   const share = async () => {
-    const text = `${item.title} — ${formatDue(item.dueAt, item.allDay)}`;
+    const text = `${item.title} — ${formatDue(item.dueAt, item.allDay, item.dueDate)}`;
     try {
       if (navigator.share) await navigator.share({ title: item.title, text });
       else {
@@ -77,7 +88,7 @@ export default function Detail() {
         setNotice("Countdown copied to clipboard.");
       }
     } catch {
-      setNotice("Share was cancelled.");
+      setNotice("Share was cancelled or unavailable.");
     }
   };
   const duplicate = () => {
@@ -92,14 +103,18 @@ export default function Detail() {
       sourceOccurrenceId: _sourceOccurrenceId,
       nextOccurrenceId: _nextOccurrenceId,
       recurrenceStoppedAt: _recurrenceStoppedAt,
+      recurrenceExceptions: _recurrenceExceptions,
+      isVirtualOccurrence: _isVirtualOccurrence,
       ...input
-    } = item;
+    } = series;
     const copy = countdownRepository.save({
       ...input,
-      title: `${item.title} (copy)`,
+      title: `${series.title} (copy)`,
+      recurrenceExceptions: [],
     } as CountdownInput);
     router.push(`/countdowns/${copy.id}`);
   };
+
   return (
     <AppShell
       title="Countdown"
@@ -108,7 +123,7 @@ export default function Detail() {
         <Link
           href={`/countdowns/${id}/edit`}
           className="icon-button"
-          aria-label="Edit countdown"
+          aria-label="Edit recurring series"
         >
           <Pencil aria-hidden="true" />
         </Link>
@@ -123,8 +138,15 @@ export default function Detail() {
           )}
           {item.title}
         </h2>
-        <p>{formatDue(item.dueAt, item.allDay)}</p>
-        <CategoryBadge category={cats.find((c) => c.id === item.categoryId)} />
+        <p>{formatDue(item.dueAt, item.allDay, item.dueDate)}</p>
+        {occurrence && (
+          <p className="muted">
+            Recurring occurrence · {occurrenceDateFor(item)}
+          </p>
+        )}
+        <CategoryBadge
+          category={cats.find((category) => category.id === item.categoryId)}
+        />
       </PixelCard>
       <PixelCard className="detail-info">
         <dl>
@@ -137,11 +159,14 @@ export default function Detail() {
               : "No reminder"}
           </dd>
           <dt>Repeat</dt>
-          <dd>{formatRecurrenceRule(item.recurrence)}</dd>
+          <dd>
+            {formatRecurrenceRule(series.recurrence)}
+            {series.recurrenceStoppedAt ? " (stopped)" : ""}
+          </dd>
           <dt>Created</dt>
-          <dd>{formatDue(item.createdAt)}</dd>
+          <dd>{formatDue(series.createdAt)}</dd>
           <dt>Updated</dt>
-          <dd>{formatDue(item.updatedAt)}</dd>
+          <dd>{formatDue(series.updatedAt)}</dd>
           {item.notes && (
             <>
               <dt>Notes</dt>
@@ -156,25 +181,23 @@ export default function Detail() {
         </p>
       )}
       <div className="action-grid">
-        {status !== "completed" ? (
-          <PixelButton
-            disabled={savingCompletion}
-            onClick={() => updateCompletion()}
-          >
-            <CircleCheck size={17} aria-hidden="true" />
-            {savingCompletion ? "Saving…" : "Mark as completed"}
-          </PixelButton>
-        ) : (
-          <PixelButton
-            disabled={savingCompletion}
-            onClick={() => updateCompletion(true)}
-          >
+        <PixelButton
+          disabled={savingCompletion}
+          onClick={() => updateCompletion(status === "completed")}
+        >
+          {status === "completed" ? (
             <RotateCcw size={17} aria-hidden="true" />
-            {savingCompletion ? "Saving…" : "Mark as incomplete"}
-          </PixelButton>
-        )}
+          ) : (
+            <CircleCheck size={17} aria-hidden="true" />
+          )}
+          {savingCompletion
+            ? "Saving…"
+            : status === "completed"
+              ? "Mark as incomplete"
+              : "Mark as completed"}
+        </PixelButton>
         <Link className="pixel-link" href={`/countdowns/${id}/edit`}>
-          Edit
+          Edit series
         </Link>
         <PixelButton onClick={share}>
           <Share2 size={17} aria-hidden="true" />
@@ -184,7 +207,7 @@ export default function Detail() {
           <Copy size={17} aria-hidden="true" />
           Duplicate
         </PixelButton>
-        {item.recurrence.enabled && (
+        {series.recurrence.enabled && !series.recurrenceStoppedAt && (
           <PixelButton onClick={() => setStopConfirm(true)}>
             <Repeat2 size={17} aria-hidden="true" />
             Stop repeating
@@ -206,23 +229,40 @@ export default function Detail() {
           router.push("/");
         }}
       >
-        This will permanently remove <strong>{item.title}</strong>. You cannot
+        This will permanently remove <strong>{series.title}</strong>. You cannot
         undo this action.
       </ConfirmDialog>
       <ConfirmDialog
         open={stopConfirm}
-        title="Stop repeating?"
+        title="Stop this recurring series?"
         confirmText="Stop repeating"
         onClose={() => setStopConfirm(false)}
         onConfirm={() => {
-          countdownRepository.stopRepeating(id);
-          setItem(countdownRepository.get(id) ?? null);
-          setNotice("Repeating stopped. Existing history was kept.");
+          countdownRepository.stopRepeating(
+            id,
+            occurrence ?? occurrenceDateFor(item),
+          );
+          setSeries(countdownRepository.get(id) ?? null);
+          setNotice("Repeating stopped. Past history was kept.");
           setStopConfirm(false);
         }}
       >
-        This occurrence remains, but completing it will not create another one.
+        Past occurrences and completed history will remain. Future occurrences
+        after this date will no longer appear.
       </ConfirmDialog>
+    </AppShell>
+  );
+}
+
+function Missing({ title, href }: { title: string; href: string }) {
+  return (
+    <AppShell title="Countdown" back>
+      <EmptyState title={title}>
+        This link no longer points to a valid countdown.
+        <Link className="pixel-link" href={href}>
+          Back to dashboard
+        </Link>
+      </EmptyState>
     </AppShell>
   );
 }

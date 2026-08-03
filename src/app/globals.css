@@ -477,6 +477,15 @@ main {
   color: var(--fg);
   margin: 0;
 }
+.error-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.error-page .pixel-card {
+  width: min(100%, 480px);
+}
 .form-layout {
   display: grid;
   gap: 16px;
@@ -1209,6 +1218,17 @@ body.modal-open {
     align-items: center;
     justify-content: space-between;
     gap: 6px;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .sidebar-top .brand {
+    min-width: 0;
+    overflow: hidden;
+  }
+  .sidebar-top .brand span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .sidebar-toggle {
     flex: 0 0 auto;
@@ -1391,9 +1411,16 @@ body.modal-open {
     max-height: calc(100dvh - 64px);
     margin: 0;
     padding: 24px;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
   }
+  .calendar-form-dialog > h2 {
+    flex: 0 0 auto;
+    margin-right: 40px;
+  }
   .calendar-form-dialog .form-layout {
+    flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
     padding-right: 4px;

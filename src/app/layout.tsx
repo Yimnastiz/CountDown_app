@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Chakra_Petch, Silkscreen } from "next/font/google";
 import "./globals.css";
+import { ServiceWorkerRegistration } from "@/components/service-worker";
 const bodyFont = Chakra_Petch({
   subsets: ["latin", "thai"],
   weight: ["400", "500", "600", "700"],
@@ -22,6 +23,10 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Count//Down",
   },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
 };
 export const viewport: Viewport = {
   width: "device-width",
@@ -42,6 +47,7 @@ export default function RootLayout({
         />
       </head>
       <body className={`${bodyFont.variable} ${displayFont.variable}`}>
+        <ServiceWorkerRegistration />
         {children}
       </body>
     </html>

@@ -9,6 +9,7 @@ import {
   ThemePreview,
 } from "@/components/ui";
 import { backupService, settingsRepository } from "@/lib/repository";
+import { ReminderSelector } from "@/components/reminder-selector";
 import { categoryRepository, countdownRepository } from "@/lib/repository";
 import {
   canRequestNotificationPermission,
@@ -65,6 +66,17 @@ export default function SettingsPage() {
     if (updates.theme) {
       document.documentElement.dataset.theme =
         updates.theme === "system" ? "" : updates.theme;
+      const colors: Partial<Record<AppSettings["theme"], string>> = {
+        "retro-green": "#283828",
+        "retro-light": "#dbe6dc",
+        "retro-dark": "#171d25",
+        "pastel-pink": "#f7e3e7",
+        "sky-blue": "#dceff5",
+        lavender: "#e9e2f4",
+      };
+      document
+        .querySelector('meta[name="theme-color"]')
+        ?.setAttribute("content", colors[updates.theme] ?? "#283828");
     }
     setMessage("Settings saved.");
   };
@@ -84,6 +96,10 @@ export default function SettingsPage() {
     const file = event.target.files?.[0];
     if (!file || (file.type && !file.name.endsWith(".json"))) {
       setMessage("Please select a JSON backup file.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage("Backup files must be smaller than 5 MB.");
       return;
     }
     const reader = new FileReader();
@@ -107,11 +123,15 @@ export default function SettingsPage() {
       return;
     }
     if (Notification.permission !== "default") return;
-    const permission = await Notification.requestPermission();
-    save({ notificationPermission: permission });
-    setDiagnostics((current) =>
-      current ? { ...current, permission } : current,
-    );
+    try {
+      const permission = await Notification.requestPermission();
+      save({ notificationPermission: permission });
+      setDiagnostics((current) =>
+        current ? { ...current, permission } : current,
+      );
+    } catch {
+      setMessage("Browser permission could not be checked. Please try again.");
+    }
   };
   return (
     <AppShell title="Settings">
@@ -123,20 +143,11 @@ export default function SettingsPage() {
       <div className="settings-stack">
         <PixelCard>
           <h2>Reminder</h2>
-          <FormField label="Default reminder days">
-            <input
-              id="default-reminder-days"
-              value={settings.defaultReminderDays.join(", ")}
-              onChange={(e) => {
-                const days = e.target.value
-                  .split(",")
-                  .map((x) => Number(x.trim()))
-                  .filter((x) => Number.isFinite(x) && x >= 0);
-                save({ defaultReminderDays: days });
-              }}
-            />
-            <small>Use 0, 1, 3, 7, 14, or 30; commas are supported.</small>
-          </FormField>
+          <ReminderSelector
+            value={settings.defaultReminderDays}
+            onChange={(defaultReminderDays) => save({ defaultReminderDays })}
+            label="Default reminder days"
+          />
         </PixelCard>
         <PixelCard>
           <h2>Notifications</h2>
@@ -157,7 +168,7 @@ export default function SettingsPage() {
           >
             {diagnostics?.permission === "denied"
               ? "Open instructions below"
-              : "Request permission"}
+              : "Enable browser permission"}
           </PixelButton>
           <details className="notification-help">
             <summary>Setup instructions</summary>

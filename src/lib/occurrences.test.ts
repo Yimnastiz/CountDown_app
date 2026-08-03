@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getVirtualOccurrencesInRange } from "./occurrences";
+import {
+  getCompletedHistory,
+  getVirtualOccurrencesInRange,
+  resolveOccurrence,
+} from "./occurrences";
 import type { Countdown } from "./types";
 
 const recurring: Countdown = {
@@ -21,26 +25,46 @@ const recurring: Countdown = {
 };
 
 describe("virtual occurrences", () => {
-  it("shows future dates immediately and keeps the stored root out of duplicates", () => {
+  it("shows each requested recurring date immediately with deterministic IDs", () => {
     const occurrences = getVirtualOccurrencesInRange(
       [recurring],
       new Date("2026-08-01T00:00:00.000Z"),
       new Date("2026-08-10T23:59:59.000Z"),
     );
     expect(occurrences.map((item) => item.dueAt.slice(0, 10))).toEqual([
+      "2026-08-03",
       "2026-08-05",
       "2026-08-07",
       "2026-08-09",
     ]);
     expect(occurrences.every((item) => item.isVirtualOccurrence)).toBe(true);
   });
-  it("does not generate after a series is stopped", () => {
+  it("does not generate future dates after a series is stopped", () => {
     expect(
       getVirtualOccurrencesInRange(
-        [{ ...recurring, recurrenceStoppedAt: "2026-08-03T12:00:00.000Z" }],
-        new Date("2026-08-01T00:00:00.000Z"),
+        [{ ...recurring, recurrenceStoppedAt: "2026-08-03" }],
+        new Date("2026-08-04T00:00:00.000Z"),
         new Date("2026-08-10T23:59:59.000Z"),
       ),
     ).toEqual([]);
+  });
+  it("completes one occurrence without affecting the next occurrence", () => {
+    const series = {
+      ...recurring,
+      recurrenceExceptions: [
+        {
+          occurrenceKey: "exercise:2026-08-05",
+          occurrenceDate: "2026-08-05",
+          status: "completed" as const,
+          completedAt: "2026-08-05T14:00:00.000Z",
+          updatedAt: "2026-08-05T14:00:00.000Z",
+        },
+      ],
+    };
+    expect(resolveOccurrence(series, "2026-08-05").status).toBe("completed");
+    expect(resolveOccurrence(series, "2026-08-07").status).not.toBe(
+      "completed",
+    );
+    expect(getCompletedHistory([series])[0].id).toBe("exercise:2026-08-05");
   });
 });

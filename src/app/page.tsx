@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { addYears } from "date-fns";
+import { addDays, subDays } from "date-fns";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Bell,
@@ -31,6 +31,7 @@ import {
 import { categoryRepository, countdownRepository } from "@/lib/repository";
 import type { Category, Countdown } from "@/lib/types";
 import { withVirtualOccurrences } from "@/lib/occurrences";
+import { occurrenceDateFor } from "@/lib/occurrences";
 const parseFilters = (params: URLSearchParams): DashboardFilters => ({
   categoryIds: params.get("categories")?.split(",").filter(Boolean) ?? [],
   importance:
@@ -57,9 +58,18 @@ function DashboardContent() {
     router.replace(query.size ? `${pathname}?${query}` : pathname);
   };
   const calendarAwareItems = useMemo(
-    () => withVirtualOccurrences(items, new Date(), addYears(new Date(), 1)),
+    () =>
+      withVirtualOccurrences(
+        items,
+        subDays(new Date(), 30),
+        addDays(new Date(), 90),
+      ),
     [items],
   );
+  const occurrenceHref = (item: Countdown) =>
+    item.isVirtualOccurrence
+      ? `/countdowns/${item.seriesId}?occurrence=${occurrenceDateFor(item)}`
+      : `/countdowns/${item.id}`;
   const active = useMemo(
     () => filterCountdowns(calendarAwareItems, filters).sort(byDue),
     [calendarAwareItems, filters],
@@ -212,7 +222,7 @@ function DashboardContent() {
           <CategoryBadge
             category={cats.find((c) => c.id === hero.categoryId)}
           />
-          <Link href={`/countdowns/${hero.id}`} className="pixel-link">
+          <Link href={occurrenceHref(hero)} className="pixel-link">
             View details
           </Link>
         </PixelCard>
@@ -266,7 +276,7 @@ function DashboardContent() {
                 key={item.id}
                 item={item}
                 categories={cats}
-                onOpen={() => router.push(`/countdowns/${item.id}`)}
+                onOpen={() => router.push(occurrenceHref(item))}
               />
             ))}
           </div>

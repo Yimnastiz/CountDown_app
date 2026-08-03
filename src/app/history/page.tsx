@@ -9,6 +9,7 @@ import {
 } from "@/components/ui";
 import { categoryRepository, countdownRepository } from "@/lib/repository";
 import { byDue } from "@/lib/date";
+import { getCompletedHistory, occurrenceDateFor } from "@/lib/occurrences";
 import type { Category, Countdown } from "@/lib/types";
 export default function HistoryPage() {
   const [items, setItems] = useState<Countdown[]>([]);
@@ -24,10 +25,9 @@ export default function HistoryPage() {
   useEffect(load, []);
   const results = useMemo(
     () =>
-      items
+      getCompletedHistory(items)
         .filter(
           (x) =>
-            ["completed", "archived"].includes(x.status) &&
             x.title.toLowerCase().includes(query.toLowerCase()) &&
             (category === "all" || x.categoryId === category),
         )
@@ -72,7 +72,13 @@ export default function HistoryPage() {
                 key={i.id}
                 item={i}
                 categories={cats}
-                onOpen={() => location.assign(`/countdowns/${i.id}`)}
+                onOpen={() =>
+                  location.assign(
+                    i.isVirtualOccurrence
+                      ? `/countdowns/${i.seriesId}?occurrence=${occurrenceDateFor(i)}`
+                      : `/countdowns/${i.id}`,
+                  )
+                }
               />
             ))}
           </div>
@@ -92,9 +98,7 @@ export default function HistoryPage() {
         confirmText="Clear history"
         onClose={() => setClear(false)}
         onConfirm={() => {
-          items
-            .filter((x) => ["completed", "archived"].includes(x.status))
-            .forEach((x) => countdownRepository.remove(x.id));
+          countdownRepository.clearCompletedHistory();
           load();
           setClear(false);
         }}

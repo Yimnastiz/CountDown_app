@@ -29,7 +29,7 @@ import {
   sortCalendarDayItems,
 } from "@/lib/calendar";
 import type { Category, Countdown } from "@/lib/types";
-import { withVirtualOccurrences } from "@/lib/occurrences";
+import { occurrenceDateFor, withVirtualOccurrences } from "@/lib/occurrences";
 export default function CalendarPage() {
   const [month, setMonth] = useState(new Date());
   const [selected, setSelected] = useState(new Date());
@@ -187,15 +187,13 @@ export default function CalendarPage() {
                   key={i.id}
                   item={i}
                   categories={cats}
-                  onOpen={() => {
-                    const opened = i.isVirtualOccurrence
-                      ? countdownRepository.materializeOccurrence(
-                          i.sourceOccurrenceId ?? i.id,
-                          i.dueAt,
-                        )
-                      : i;
-                    if (opened) location.assign(`/countdowns/${opened.id}`);
-                  }}
+                  onOpen={() =>
+                    location.assign(
+                      i.isVirtualOccurrence
+                        ? `/countdowns/${i.seriesId}?occurrence=${occurrenceDateFor(i)}`
+                        : `/countdowns/${i.id}`,
+                    )
+                  }
                 />
               ))}
             </div>

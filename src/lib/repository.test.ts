@@ -59,15 +59,13 @@ describe("countdown repository", () => {
     const saved = countdownRepository.save(input(false));
     expect(saved.id).not.toBe("");
   });
-  it("creates exactly one next occurrence when completed repeatedly", () => {
+  it("creates one completion exception when completed repeatedly", () => {
     const saved = countdownRepository.save(input());
     countdownRepository.complete(saved.id);
     countdownRepository.complete(saved.id);
     const items = countdownRepository.list();
-    expect(items).toHaveLength(2);
-    expect(
-      items.find((item) => item.sourceOccurrenceId === saved.id)?.dueAt,
-    ).toContain("2026-01-12");
+    expect(items).toHaveLength(1);
+    expect(items[0].recurrenceExceptions).toHaveLength(1);
   });
   it("does not create a next occurrence after stopping recurrence", () => {
     const saved = countdownRepository.save(input());
@@ -75,18 +73,16 @@ describe("countdown repository", () => {
     countdownRepository.complete(saved.id);
     expect(countdownRepository.list()).toHaveLength(1);
   });
-  it("materializes an opened virtual occurrence once without pre-generating a series", () => {
+  it("stores a recurring completion as one exception without creating a next record", () => {
     const saved = countdownRepository.save(input());
-    const first = countdownRepository.materializeOccurrence(
-      saved.id,
-      "2026-01-12T12:00:00.000Z",
+    countdownRepository.complete(saved.id, "2026-01-12");
+    countdownRepository.complete(saved.id, "2026-01-12");
+    const current = countdownRepository.get(saved.id);
+    expect(countdownRepository.list()).toHaveLength(1);
+    expect(current?.recurrenceExceptions).toHaveLength(1);
+    expect(current?.recurrenceExceptions?.[0].occurrenceDate).toBe(
+      "2026-01-12",
     );
-    const second = countdownRepository.materializeOccurrence(
-      saved.id,
-      "2026-01-12T12:00:00.000Z",
-    );
-    expect(first?.id).toBe(second?.id);
-    expect(countdownRepository.list()).toHaveLength(2);
   });
   it("exports and imports recurrence, icons, and new themes", () => {
     const saved = countdownRepository.save({
