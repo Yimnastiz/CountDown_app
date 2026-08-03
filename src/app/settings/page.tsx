@@ -206,6 +206,21 @@ export default function SettingsPage() {
               </label>
             ))}
           </div>
+          <FormField label="Desktop sidebar">
+            <select
+              value={settings.sidebarMode ?? "expanded"}
+              onChange={(event) =>
+                save({
+                  sidebarMode: event.target.value as
+                    "expanded" | "collapsed" | "hidden",
+                })
+              }
+            >
+              <option value="expanded">Expanded</option>
+              <option value="collapsed">Collapsed</option>
+              <option value="hidden">Focus mode (hidden)</option>
+            </select>
+          </FormField>
         </PixelCard>
         <PixelCard>
           <h2>Data management</h2>

@@ -24,6 +24,7 @@ export const defaultSettings: AppSettings = {
   defaultReminderDays: [7, 1],
   theme: "system",
   notificationPermission: "default",
+  sidebarMode: "expanded",
 };
 export const demoCountdowns = (): Countdown[] => {
   const createdAt = new Date().toISOString();

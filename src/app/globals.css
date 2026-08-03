@@ -226,6 +226,24 @@ main {
   text-decoration: none;
   color: var(--fg-muted);
 }
+.mobile-nav button {
+  display: flex;
+  min-width: 44px;
+  min-height: 48px;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 0.65rem;
+  border: 0;
+  background: transparent;
+  color: var(--fg-muted);
+}
+.mobile-nav button.active {
+  color: var(--primary);
+  font-weight: bold;
+}
 .mobile-nav a.active {
   color: var(--primary);
   font-weight: bold;
@@ -486,10 +504,128 @@ main {
   color: var(--fg);
   min-height: 44px;
   font-size: 16px;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 8px;
 }
 .field textarea {
   min-height: 84px;
+}
+.date-input {
+  appearance: auto;
+  -webkit-appearance: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.reminder-field {
+  grid-column: 1/-1;
+}
+.reminder-chips,
+.chosen-reminders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.reminder-chips button,
+.chosen-reminders button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+  padding: 7px 9px;
+}
+.reminder-chips button.selected,
+.chosen-reminders button {
+  background: var(--primary);
+  color: var(--surface);
+}
+.custom-reminder-trigger {
+  border-style: dashed !important;
+}
+.custom-reminder {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.custom-reminder input {
+  min-width: 0;
+  width: 100%;
+  max-width: 160px;
+  min-height: 44px;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  padding: 7px;
+  font-size: 16px;
+}
+.calendar-form-backdrop {
+  align-items: end;
+  padding: 0;
+}
+.calendar-form-dialog {
+  width: min(100%, 760px);
+  max-height: calc(100dvh - env(safe-area-inset-top));
+  overflow: auto;
+  margin: 0;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+}
+.calendar-form-dialog .form-layout {
+  margin-top: 14px;
+}
+.calendar-form-dialog .pixel-card {
+  box-shadow: none;
+  margin-bottom: 10px;
+}
+.calendar-form-dialog .form-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: var(--surface);
+  padding: 12px 0 calc(8px + env(safe-area-inset-bottom));
+}
+.calendar-feedback {
+  position: fixed;
+  left: 50%;
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 20;
+  background: var(--success);
+  color: #fff;
+  border: 2px solid var(--border);
+  padding: 9px 12px;
+  box-shadow: 3px 3px 0 var(--shadow);
+}
+.mobile-more {
+  position: relative;
+  width: 100%;
+  margin-top: auto;
+  background: var(--surface);
+  border: 3px solid var(--border);
+  padding: 22px 16px calc(16px + env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 0 var(--shadow);
+}
+.mobile-more h2 {
+  margin-right: 44px;
+}
+.mobile-more a {
+  min-height: 48px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 2px solid var(--border);
+  background: var(--surface-raised);
+  text-decoration: none;
+  margin-top: 8px;
+}
+.mobile-more-backdrop {
+  align-items: end;
 }
 .field small {
   color: var(--fg-muted);
@@ -987,6 +1123,22 @@ main {
   .app-shell {
     display: grid;
     grid-template-columns: 240px 1fr;
+    transition: grid-template-columns 0.16s ease;
+  }
+  .app-shell.sidebar-collapsed {
+    grid-template-columns: 76px 1fr;
+  }
+  .app-shell.sidebar-hidden {
+    grid-template-columns: 1fr;
+  }
+  .sidebar-hidden .sidebar {
+    display: none;
+  }
+  .sidebar-reveal {
+    position: fixed;
+    z-index: 15;
+    top: calc(12px + env(safe-area-inset-top));
+    left: 12px;
   }
   .sidebar {
     display: block;
@@ -996,6 +1148,49 @@ main {
     padding: 26px 16px;
     border-right: 3px solid var(--border);
     background: var(--surface);
+  }
+  .sidebar-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .sidebar-toggle {
+    flex: 0 0 auto;
+  }
+  .sidebar-collapsed .sidebar {
+    padding: 26px 12px;
+  }
+  .sidebar-collapsed .brand span,
+  .sidebar-collapsed .sidebar > p,
+  .sidebar-collapsed .sidebar-nav a span {
+    display: none;
+  }
+  .sidebar-collapsed .brand {
+    justify-content: center;
+  }
+  .sidebar-collapsed .sidebar-top {
+    flex-direction: column;
+  }
+  .sidebar-collapsed .sidebar-nav a {
+    justify-content: center;
+    padding: 9px;
+  }
+  .sidebar-collapsed .sidebar-nav {
+    margin-top: 20px;
+  }
+  .sidebar-collapsed .sidebar-nav a:hover::after,
+  .sidebar-collapsed .sidebar-nav a:focus-visible::after {
+    content: attr(aria-label);
+    position: absolute;
+    left: 62px;
+    z-index: 25;
+    padding: 6px 8px;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    color: var(--fg);
+    box-shadow: 2px 2px 0 var(--shadow);
+    white-space: nowrap;
   }
   .brand {
     display: flex;
@@ -1025,6 +1220,7 @@ main {
     padding: 9px;
     text-decoration: none;
     border: 2px solid transparent;
+    position: relative;
   }
   .sidebar-nav a.active {
     background: var(--muted);
@@ -1036,6 +1232,21 @@ main {
     color: var(--surface);
     border-color: var(--border);
     box-shadow: 3px 3px 0 var(--shadow);
+  }
+  .sidebar-nav a:hover,
+  .quick-action:hover,
+  .countdown-card:hover,
+  .theme-options label:hover,
+  .filter-toggle:hover {
+    transform: translateY(-1px);
+    background: var(--surface-raised);
+  }
+  .sidebar-nav .add-link:hover {
+    background: var(--primary);
+  }
+  .month-grid button:hover,
+  .icon-button:hover {
+    background: var(--muted);
   }
   .mobile-nav {
     display: none;

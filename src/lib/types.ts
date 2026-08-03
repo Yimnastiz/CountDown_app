@@ -59,6 +59,7 @@ export interface AppSettings {
     | "lavender";
   notificationPermission: "default" | "granted" | "denied" | "unsupported";
   lastBackupAt?: string;
+  sidebarMode?: "expanded" | "collapsed" | "hidden";
 }
 export interface BackupFile {
   schemaVersion: number;

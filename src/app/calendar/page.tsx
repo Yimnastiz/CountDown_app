@@ -11,10 +11,10 @@ import {
   startOfWeek,
   subMonths,
 } from "date-fns";
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { AppShell } from "@/components/shell";
+import { CountdownForm } from "@/components/countdown-form";
 import {
   CountdownCard,
   EmptyState,
@@ -37,6 +37,9 @@ export default function CalendarPage() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
   const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
+  const [formOpen, setFormOpen] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const addButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     setItems(countdownRepository.list());
     setCats(categoryRepository.list());
@@ -54,6 +57,17 @@ export default function CalendarPage() {
       (i) => sameDate(i.dueAt, selected) && statusFor(i) !== "archived",
     ),
   );
+  const closeForm = () => {
+    setFormOpen(false);
+    requestAnimationFrame(() => addButton.current?.focus());
+  };
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && formOpen) closeForm();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [formOpen]);
   return (
     <AppShell title="Calendar">
       <div className="calendar-layout">
@@ -125,12 +139,13 @@ export default function CalendarPage() {
         <section className="agenda">
           <div className="section-heading">
             <h2>{format(selected, "EEE, d MMM")}</h2>
-            <Link
-              className="pixel-link small-link"
-              href={`/countdowns/new?date=${format(selected, "yyyy-MM-dd")}`}
+            <button
+              ref={addButton}
+              className="pixel-button small-link"
+              onClick={() => setFormOpen(true)}
             >
               Add
-            </Link>
+            </button>
           </div>
           {agenda.length ? (
             <div className="list">
@@ -146,12 +161,9 @@ export default function CalendarPage() {
           ) : (
             <EmptyState title="Nothing due this day">
               Pick another date or add a countdown.
-              <Link
-                className="pixel-link"
-                href={`/countdowns/new?date=${format(selected, "yyyy-MM-dd")}`}
-              >
+              <PixelButton onClick={() => setFormOpen(true)}>
                 Add countdown
-              </Link>
+              </PixelButton>
             </EmptyState>
           )}
           {items.filter((i) => statusFor(i) === "overdue").length > 0 && (
@@ -220,6 +232,43 @@ export default function CalendarPage() {
             </div>
           </div>
         </div>
+      )}
+      {formOpen && (
+        <div
+          className="dialog-backdrop calendar-form-backdrop"
+          role="presentation"
+        >
+          <section
+            className="dialog calendar-form-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add countdown"
+          >
+            <button
+              className="icon-button close"
+              aria-label="Close add countdown"
+              onClick={closeForm}
+            >
+              <X aria-hidden="true" />
+            </button>
+            <h2>Add countdown</h2>
+            <CountdownForm
+              mode="modal"
+              prefillDate={format(selected, "yyyy-MM-dd")}
+              onCancel={closeForm}
+              onSaved={() => {
+                setItems(countdownRepository.list());
+                setFeedback("Countdown added to the calendar.");
+                closeForm();
+              }}
+            />
+          </section>
+        </div>
+      )}
+      {feedback && (
+        <p className="calendar-feedback" role="status">
+          {feedback}
+        </p>
       )}
     </AppShell>
   );

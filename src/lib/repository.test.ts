@@ -44,6 +44,10 @@ afterAll(() =>
   }),
 );
 describe("countdown repository", () => {
+  it("persists the selected sidebar mode", () => {
+    settingsRepository.save({ sidebarMode: "collapsed" });
+    expect(settingsRepository.get().sidebarMode).toBe("collapsed");
+  });
   it("creates a countdown when randomUUID is unavailable", () => {
     Object.defineProperty(globalThis, "crypto", {
       configurable: true,

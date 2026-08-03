@@ -141,19 +141,17 @@ export const countdownRepository = {
     const stoppedAt = new Date().toISOString();
     write(
       keys.countdowns,
-      countdownRepository
-        .list()
-        .map((value) =>
-          value.id === id || value.id === item.nextOccurrenceId
-            ? {
-                ...value,
-                recurrence: { ...value.recurrence, enabled: false },
-                repeat: "never" as const,
-                recurrenceStoppedAt: stoppedAt,
-                updatedAt: stoppedAt,
-              }
-            : value,
-        ),
+      countdownRepository.list().map((value) =>
+        value.id === id || value.id === item.nextOccurrenceId
+          ? {
+              ...value,
+              recurrence: { ...value.recurrence, enabled: false },
+              repeat: "never" as const,
+              recurrenceStoppedAt: stoppedAt,
+              updatedAt: stoppedAt,
+            }
+          : value,
+      ),
     );
   },
   remove: (id: string) =>
