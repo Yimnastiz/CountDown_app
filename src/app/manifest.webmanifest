@@ -1,0 +1,10 @@
+{
+  "name": "Count//Down",
+  "short_name": "Countdown",
+  "description": "Personal countdowns for important days",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#e6ecd2",
+  "theme_color": "#283828",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
