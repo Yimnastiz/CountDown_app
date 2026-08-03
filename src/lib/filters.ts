@@ -9,6 +9,7 @@ export const emptyDashboardFilters: DashboardFilters = {
   categoryIds: [],
   importance: "all",
 };
+export const DEFAULT_FILTER_PANEL_OPEN = false;
 export function filterCountdowns(
   items: Countdown[],
   filters: DashboardFilters,

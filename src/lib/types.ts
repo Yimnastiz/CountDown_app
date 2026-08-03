@@ -30,6 +30,10 @@ export interface Countdown {
   status: CountdownStatus;
   completedAt?: string;
   archivedAt?: string;
+  seriesId?: string;
+  sourceOccurrenceId?: string;
+  nextOccurrenceId?: string;
+  recurrenceStoppedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -39,13 +43,22 @@ export interface Category {
   icon: string;
   color: string;
   isDefault: boolean;
+  kind?: "default" | "custom" | "other";
   createdAt: string;
   updatedAt: string;
 }
 export interface AppSettings {
   defaultReminderDays: number[];
-  theme: "system" | "retro-green" | "retro-light" | "retro-dark";
+  theme:
+    | "system"
+    | "retro-green"
+    | "retro-light"
+    | "retro-dark"
+    | "pastel-pink"
+    | "sky-blue"
+    | "lavender";
   notificationPermission: "default" | "granted" | "denied" | "unsupported";
+  lastBackupAt?: string;
 }
 export interface BackupFile {
   schemaVersion: number;

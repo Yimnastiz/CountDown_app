@@ -9,10 +9,16 @@ import {
 } from "@/components/ui";
 import { categoryRepository, countdownRepository } from "@/lib/repository";
 import type { Category } from "@/lib/types";
+import { createId } from "@/lib/id";
+import {
+  CategoryIcon,
+  categoryIconLabels,
+  categoryIconRegistry,
+} from "@/lib/icons";
 const blank = (): Category => ({
   id: "",
   name: "",
-  icon: "Tag",
+  icon: "shapes",
   color: "#63704d",
   isDefault: false,
   createdAt: "",
@@ -22,6 +28,7 @@ export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [editing, setEditing] = useState<Category | null>(null);
   const [remove, setRemove] = useState<Category | null>(null);
+  const [iconSearch, setIconSearch] = useState("");
   const load = () => setCategories(categoryRepository.list());
   useEffect(load, []);
   const save = (e: React.FormEvent) => {
@@ -30,7 +37,7 @@ export default function CategoriesPage() {
     const now = new Date().toISOString();
     categoryRepository.save({
       ...editing,
-      id: editing.id || crypto.randomUUID(),
+      id: editing.id || createId(),
       name: editing.name.trim(),
       createdAt: editing.createdAt || now,
       updatedAt: now,
@@ -52,7 +59,7 @@ export default function CategoriesPage() {
           {categories.map((c) => (
             <PixelCard key={c.id} className="category-row">
               <span className="category-icon" style={{ background: c.color }}>
-                {c.icon.slice(0, 1)}
+                <CategoryIcon name={c.icon} size={20} />
               </span>
               <div>
                 <b>{c.name}</b>
@@ -92,16 +99,44 @@ export default function CategoriesPage() {
                 required
               />
             </label>
-            <label className="field">
-              Icon word
+            <div className="field">
+              <span>Icon</span>
+              <div className="selected-icon-preview">
+                <CategoryIcon name={editing.icon} size={22} />
+                {categoryIconLabels[editing.icon] ?? "Shapes"}
+              </div>
               <input
-                value={editing.icon}
-                onChange={(e) =>
-                  setEditing({ ...editing, icon: e.target.value })
-                }
-                placeholder="e.g. Tag"
+                aria-label="Search category icons"
+                value={iconSearch}
+                onChange={(e) => setIconSearch(e.target.value)}
+                placeholder="Search icons"
               />
-            </label>
+              <div
+                className="icon-picker"
+                role="listbox"
+                aria-label="Category icon"
+              >
+                {Object.keys(categoryIconRegistry)
+                  .filter((key) =>
+                    categoryIconLabels[key]
+                      .toLowerCase()
+                      .includes(iconSearch.toLowerCase()),
+                  )
+                  .map((key) => (
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={editing.icon === key}
+                      className={editing.icon === key ? "selected" : ""}
+                      key={key}
+                      onClick={() => setEditing({ ...editing, icon: key })}
+                    >
+                      <CategoryIcon name={key} size={20} />
+                      <span>{categoryIconLabels[key]}</span>
+                    </button>
+                  ))}
+              </div>
+            </div>
             <label className="field">
               Colour
               <input

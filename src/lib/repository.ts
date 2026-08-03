@@ -9,6 +9,9 @@ import type {
 } from "./types";
 import { normalizeLegacyRepeatRule } from "./recurrence";
 import { incompleteStatusFor } from "./date";
+import { getNextOccurrence } from "./recurrence";
+import { createId } from "./id";
+import { normalizeCategory, sortCategories } from "./categories";
 const keys = {
   countdowns: "countdown-app.countdowns",
   categories: "countdown-app.categories",
@@ -32,14 +35,15 @@ const normalizeCountdown = (value: Countdown): Countdown => ({
 const normalizeCountdowns = (values: Countdown[]) =>
   values.map(normalizeCountdown);
 export const categoryRepository = {
-  list: () => read(keys.categories, defaultCategories),
+  list: () => sortCategories(read(keys.categories, defaultCategories)),
   save: (item: Category) => {
+    const normalized = normalizeCategory(item);
     const all = categoryRepository.list();
     write(
       keys.categories,
-      all.some((x) => x.id === item.id)
-        ? all.map((x) => (x.id === item.id ? item : x))
-        : [...all, item],
+      all.some((x) => x.id === normalized.id)
+        ? all.map((x) => (x.id === normalized.id ? normalized : x))
+        : [...all, normalized],
     );
   },
   remove: (id: string) =>
@@ -56,7 +60,7 @@ export const countdownRepository = {
     const item: Countdown = {
       ...input,
       recurrence: normalizeLegacyRepeatRule(input.repeat, input.recurrence),
-      id: old?.id ?? crypto.randomUUID(),
+      id: old?.id ?? createId(),
       status: old?.status ?? "upcoming",
       createdAt: old?.createdAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -82,16 +86,75 @@ export const countdownRepository = {
         ),
     );
   },
-  complete: (id: string) =>
-    countdownRepository.patch(id, {
+  complete: (id: string) => {
+    const all = countdownRepository.list();
+    const item = all.find((value) => value.id === id);
+    if (!item || item.status === "completed")
+      return {
+        item,
+        next: item?.nextOccurrenceId
+          ? all.find((value) => value.id === item.nextOccurrenceId)
+          : undefined,
+      };
+    const now = new Date().toISOString();
+    let next: Countdown | undefined;
+    let nextOccurrenceId = item.nextOccurrenceId;
+    const nextDate = getNextOccurrence(item.dueAt, item.recurrence);
+    if (item.recurrence.enabled && !nextOccurrenceId && nextDate) {
+      nextOccurrenceId = createId();
+      next = {
+        ...item,
+        id: nextOccurrenceId,
+        dueAt: nextDate.toISOString(),
+        status: incompleteStatusFor({ dueAt: nextDate.toISOString() }),
+        completedAt: undefined,
+        archivedAt: undefined,
+        sourceOccurrenceId: item.id,
+        seriesId: item.seriesId ?? item.id,
+        nextOccurrenceId: undefined,
+        createdAt: now,
+        updatedAt: now,
+      };
+    }
+    const completed: Countdown = {
+      ...item,
       status: "completed",
-      completedAt: new Date().toISOString(),
-    }),
+      completedAt: now,
+      nextOccurrenceId,
+      updatedAt: now,
+    };
+    write(keys.countdowns, [
+      ...all.map((value) => (value.id === id ? completed : value)),
+      ...(next ? [next] : []),
+    ]);
+    return { item: completed, next };
+  },
   undoCompletion: (id: string) => {
     const item = countdownRepository.get(id);
     if (!item) return;
     const restored = incompleteStatusFor(item);
     countdownRepository.patch(id, { status: restored, completedAt: undefined });
+  },
+  stopRepeating: (id: string) => {
+    const item = countdownRepository.get(id);
+    if (!item) return;
+    const stoppedAt = new Date().toISOString();
+    write(
+      keys.countdowns,
+      countdownRepository
+        .list()
+        .map((value) =>
+          value.id === id || value.id === item.nextOccurrenceId
+            ? {
+                ...value,
+                recurrence: { ...value.recurrence, enabled: false },
+                repeat: "never" as const,
+                recurrenceStoppedAt: stoppedAt,
+                updatedAt: stoppedAt,
+              }
+            : value,
+        ),
+    );
   },
   remove: (id: string) =>
     write(
@@ -116,7 +179,7 @@ export const settingsRepository = {
 };
 export const backupService = {
   make: (): BackupFile => ({
-    schemaVersion: 2,
+    schemaVersion: 3,
     exportedAt: new Date().toISOString(),
     countdowns: countdownRepository.list(),
     categories: categoryRepository.list(),
@@ -126,7 +189,7 @@ export const backupService = {
     Boolean(
       value &&
       typeof value === "object" &&
-      [1, 2].includes((value as BackupFile).schemaVersion) &&
+      [1, 2, 3].includes((value as BackupFile).schemaVersion) &&
       Array.isArray((value as BackupFile).countdowns) &&
       Array.isArray((value as BackupFile).categories) &&
       (value as BackupFile).settings,
@@ -135,7 +198,7 @@ export const backupService = {
     const importedCountdowns = normalizeCountdowns(data.countdowns);
     if (mode === "replace") {
       write(keys.countdowns, importedCountdowns);
-      write(keys.categories, data.categories);
+      write(keys.categories, sortCategories(data.categories));
     } else {
       const current = countdownRepository.list();
       write(keys.countdowns, [
@@ -147,7 +210,7 @@ export const backupService = {
       const cats = categoryRepository.list();
       write(keys.categories, [
         ...cats.filter((x) => !data.categories.some((y) => y.id === x.id)),
-        ...data.categories,
+        ...data.categories.map(normalizeCategory),
       ]);
     }
     settingsRepository.save(data.settings);

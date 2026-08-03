@@ -6,6 +6,7 @@ import {
   CircleCheck,
   Copy,
   Pencil,
+  Repeat2,
   RotateCcw,
   Share2,
   Star,
@@ -30,6 +31,7 @@ export default function Detail() {
   const [item, setItem] = useState<Countdown | null | undefined>();
   const [cats, setCats] = useState<Category[]>([]);
   const [confirm, setConfirm] = useState(false);
+  const [stopConfirm, setStopConfirm] = useState(false);
   const [notice, setNotice] = useState("");
   const [savingCompletion, setSavingCompletion] = useState(false);
   useEffect(() => {
@@ -56,8 +58,12 @@ export default function Detail() {
       countdownRepository.undoCompletion(id);
       setNotice("Completion undone. The countdown is active again.");
     } else {
-      countdownRepository.complete(id);
-      setNotice("Marked as completed.");
+      const result = countdownRepository.complete(id);
+      setNotice(
+        result?.next
+          ? `Marked as completed. Next occurrence: ${formatDue(result.next.dueAt, result.next.allDay)}.`
+          : "Marked as completed.",
+      );
     }
     setItem(countdownRepository.get(id) ?? null);
     setSavingCompletion(false);
@@ -82,6 +88,10 @@ export default function Detail() {
       updatedAt: _updatedAt,
       completedAt: _completedAt,
       archivedAt: _archivedAt,
+      seriesId: _seriesId,
+      sourceOccurrenceId: _sourceOccurrenceId,
+      nextOccurrenceId: _nextOccurrenceId,
+      recurrenceStoppedAt: _recurrenceStoppedAt,
       ...input
     } = item;
     const copy = countdownRepository.save({
@@ -174,6 +184,12 @@ export default function Detail() {
           <Copy size={17} aria-hidden="true" />
           Duplicate
         </PixelButton>
+        {item.recurrence.enabled && (
+          <PixelButton onClick={() => setStopConfirm(true)}>
+            <Repeat2 size={17} aria-hidden="true" />
+            Stop repeating
+          </PixelButton>
+        )}
         <PixelButton className="danger" onClick={() => setConfirm(true)}>
           <Trash2 size={17} aria-hidden="true" />
           Delete
@@ -192,6 +208,20 @@ export default function Detail() {
       >
         This will permanently remove <strong>{item.title}</strong>. You cannot
         undo this action.
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={stopConfirm}
+        title="Stop repeating?"
+        confirmText="Stop repeating"
+        onClose={() => setStopConfirm(false)}
+        onConfirm={() => {
+          countdownRepository.stopRepeating(id);
+          setItem(countdownRepository.get(id) ?? null);
+          setNotice("Repeating stopped. Existing history was kept.");
+          setStopConfirm(false);
+        }}
+      >
+        This occurrence remains, but completing it will not create another one.
       </ConfirmDialog>
     </AppShell>
   );

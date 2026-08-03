@@ -17,6 +17,7 @@ import type {
   RepeatType,
 } from "@/lib/types";
 import { disabledRecurrence, validateRecurrenceRule } from "@/lib/recurrence";
+import { parseLocalDateParam } from "@/lib/calendar";
 const repeats: RepeatType[] = [
   "never",
   "daily",
@@ -25,15 +26,22 @@ const repeats: RepeatType[] = [
   "yearly",
   "custom",
 ];
-export function CountdownForm({ existing }: { existing?: Countdown }) {
+export function CountdownForm({
+  existing,
+  prefillDate,
+}: {
+  existing?: Countdown;
+  prefillDate?: string;
+}) {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const initialDate = parseLocalDateParam(prefillDate, new Date());
   const initial = existing ?? {
     title: "",
     description: "",
-    dueAt: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+    dueAt: format(initialDate, "yyyy-MM-dd'T'HH:mm"),
     allDay: true,
     categoryId: "personal",
     reminderDays: [7, 1],

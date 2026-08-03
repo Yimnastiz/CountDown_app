@@ -16,6 +16,7 @@ export const defaultCategories: Category[] = [
   icon,
   color,
   isDefault: true,
+  kind: id === "other" ? "other" : "default",
   createdAt: now,
   updatedAt: now,
 }));

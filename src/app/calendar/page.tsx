@@ -22,14 +22,21 @@ import {
   PixelCard,
 } from "@/components/ui";
 import { categoryRepository, countdownRepository } from "@/lib/repository";
-import { byDue, sameDate, statusFor } from "@/lib/date";
-import { isWeekendDate } from "@/lib/calendar";
+import { sameDate, statusFor } from "@/lib/date";
+import {
+  isWeekendDate,
+  monthFromSelection,
+  sortCalendarDayItems,
+} from "@/lib/calendar";
 import type { Category, Countdown } from "@/lib/types";
 export default function CalendarPage() {
   const [month, setMonth] = useState(new Date());
   const [selected, setSelected] = useState(new Date());
   const [items, setItems] = useState<Countdown[]>([]);
   const [cats, setCats] = useState<Category[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
+  const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
   useEffect(() => {
     setItems(countdownRepository.list());
     setCats(categoryRepository.list());
@@ -42,9 +49,11 @@ export default function CalendarPage() {
       }),
     [month],
   );
-  const agenda = items
-    .filter((i) => sameDate(i.dueAt, selected) && statusFor(i) !== "archived")
-    .sort(byDue);
+  const agenda = sortCalendarDayItems(
+    items.filter(
+      (i) => sameDate(i.dueAt, selected) && statusFor(i) !== "archived",
+    ),
+  );
   return (
     <AppShell title="Calendar">
       <div className="calendar-layout">
@@ -56,7 +65,17 @@ export default function CalendarPage() {
             >
               <ChevronLeft aria-hidden="true" />
             </PixelButton>
-            <h2>{format(month, "MMMM yyyy")}</h2>
+            <button
+              className="month-year-button"
+              aria-haspopup="dialog"
+              onClick={() => {
+                setPickerYear(month.getFullYear());
+                setPickerMonth(month.getMonth());
+                setPickerOpen(true);
+              }}
+            >
+              {format(month, "MMMM yyyy")}
+            </button>
             <PixelButton
               aria-label="Next month"
               onClick={() => setMonth(addMonths(month, 1))}
@@ -143,6 +162,65 @@ export default function CalendarPage() {
           )}
         </section>
       </div>
+      {pickerOpen && (
+        <div className="dialog-backdrop">
+          <div
+            className="dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="month-year-title"
+          >
+            <h2 id="month-year-title">Choose month and year</h2>
+            <div className="month-year-fields">
+              <label className="field">
+                Month
+                <select
+                  autoFocus
+                  value={pickerMonth}
+                  onChange={(e) => setPickerMonth(Number(e.target.value))}
+                >
+                  {Array.from({ length: 12 }, (_, index) => (
+                    <option value={index} key={index}>
+                      {format(new Date(2020, index, 1), "MMMM")}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                Year (พ.ศ.)
+                <select
+                  value={pickerYear}
+                  onChange={(e) => setPickerYear(Number(e.target.value))}
+                >
+                  {Array.from(
+                    { length: 71 },
+                    (_, index) => new Date().getFullYear() - 20 + index,
+                  ).map((year) => (
+                    <option value={year} key={year}>
+                      {year + 543}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="dialog-actions">
+              <PixelButton onClick={() => setPickerOpen(false)}>
+                Cancel
+              </PixelButton>
+              <PixelButton
+                onClick={() => {
+                  const next = monthFromSelection(pickerYear, pickerMonth);
+                  setMonth(next);
+                  setSelected(next);
+                  setPickerOpen(false);
+                }}
+              >
+                Go to month
+              </PixelButton>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }

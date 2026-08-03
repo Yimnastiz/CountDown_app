@@ -8,6 +8,7 @@ import {
   CirclePlus,
   FolderCog,
   Settings,
+  SlidersHorizontal,
   Star,
   X,
 } from "lucide-react";
@@ -24,6 +25,7 @@ import {
   emptyDashboardFilters,
   filterCountdowns,
   type DashboardFilters,
+  DEFAULT_FILTER_PANEL_OPEN,
 } from "@/lib/filters";
 import { categoryRepository, countdownRepository } from "@/lib/repository";
 import type { Category, Countdown } from "@/lib/types";
@@ -35,6 +37,7 @@ const parseFilters = (params: URLSearchParams): DashboardFilters => ({
 function DashboardContent() {
   const [items, setItems] = useState<Countdown[]>([]);
   const [cats, setCats] = useState<Category[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(DEFAULT_FILTER_PANEL_OPEN);
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -85,10 +88,45 @@ function DashboardContent() {
               new Date(),
             )}
           </p>
-          <h2>What needs your attention?</h2>
         </div>
       </div>
-      <section className="dashboard-filters" aria-label="Dashboard filters">
+      <div className="filter-toolbar">
+        <button
+          className="filter-toggle"
+          aria-expanded={filtersOpen}
+          aria-controls="dashboard-filter-panel"
+          onClick={() => setFiltersOpen((open) => !open)}
+        >
+          <SlidersHorizontal size={18} aria-hidden="true" />
+          Filters
+          {selectedFilters > 0 && (
+            <span className="filter-count">{selectedFilters}</span>
+          )}
+        </button>
+        {!filtersOpen && selectedFilters > 0 && (
+          <span className="filter-summary">
+            {filters.categoryIds.length
+              ? cats.find((cat) => cat.id === filters.categoryIds[0])?.name
+              : filters.importance}
+            {selectedFilters > 1 ? ` + ${selectedFilters - 1}` : ""}
+          </span>
+        )}
+        {!filtersOpen && selectedFilters > 0 && (
+          <button
+            className="clear-filter"
+            onClick={() => setFilters(emptyDashboardFilters)}
+          >
+            <X size={15} aria-hidden="true" />
+            Clear filters
+          </button>
+        )}
+      </div>
+      <section
+        id="dashboard-filter-panel"
+        className={`dashboard-filters ${filtersOpen ? "open" : ""}`}
+        aria-label="Dashboard filters"
+        hidden={!filtersOpen}
+      >
         <div className="filter-heading">
           <span>
             Filters{selectedFilters ? ` · ${selectedFilters} selected` : ""}

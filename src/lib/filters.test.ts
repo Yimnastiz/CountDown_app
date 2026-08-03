@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterCountdowns } from "./filters";
+import { DEFAULT_FILTER_PANEL_OPEN, filterCountdowns } from "./filters";
 import type { Countdown } from "./types";
 const base = (
   id: string,
@@ -24,6 +24,7 @@ const base = (
   updatedAt: "2026-01-01T00:00:00.000Z",
 });
 describe("dashboard filters", () => {
+  it("starts collapsed", () => expect(DEFAULT_FILTER_PANEL_OPEN).toBe(false));
   const items = [
     base("vehicle", "vehicle", true),
     base("health", "health", false),

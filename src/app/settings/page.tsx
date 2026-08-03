@@ -9,20 +9,54 @@ import {
   ThemePreview,
 } from "@/components/ui";
 import { backupService, settingsRepository } from "@/lib/repository";
+import { categoryRepository, countdownRepository } from "@/lib/repository";
+import {
+  canRequestNotificationPermission,
+  notificationStatus,
+  type NotificationDiagnostics,
+} from "@/lib/notifications";
 import type { AppSettings, BackupFile } from "@/lib/types";
 const themes: AppSettings["theme"][] = [
   "system",
   "retro-green",
   "retro-light",
   "retro-dark",
+  "pastel-pink",
+  "sky-blue",
+  "lavender",
 ];
+const themeNames: Record<AppSettings["theme"], string> = {
+  system: "System",
+  "retro-green": "Retro Green",
+  "retro-light": "Retro Light",
+  "retro-dark": "Retro Dark",
+  "pastel-pink": "Pastel Pink Retro",
+  "sky-blue": "Sky Blue Retro",
+  lavender: "Lavender Retro",
+};
 export default function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [message, setMessage] = useState("");
   const [clear, setClear] = useState(false);
   const [imported, setImported] = useState<BackupFile | null>(null);
   const [importMode, setImportMode] = useState<"merge" | "replace">("merge");
-  useEffect(() => setSettings(settingsRepository.get()), []);
+  const [diagnostics, setDiagnostics] =
+    useState<NotificationDiagnostics | null>(null);
+  useEffect(() => {
+    setSettings(settingsRepository.get());
+    const notification = "Notification" in window;
+    const permission = notification ? Notification.permission : "unsupported";
+    setDiagnostics({
+      secure: window.isSecureContext,
+      standalone:
+        window.matchMedia("(display-mode: standalone)").matches ||
+        Boolean((navigator as Navigator & { standalone?: boolean }).standalone),
+      notification,
+      serviceWorker: "serviceWorker" in navigator,
+      pushManager: "PushManager" in window,
+      permission,
+    });
+  }, []);
   if (!settings) return null;
   const save = (updates: Partial<AppSettings>) => {
     const next = { ...settings, ...updates };
@@ -44,6 +78,7 @@ export default function SettingsPage() {
     a.download = `countdown-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    save({ lastBackupAt: file.exportedAt });
   };
   const fileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -60,7 +95,7 @@ export default function SettingsPage() {
         setImported(value);
       } catch {
         setMessage(
-          "This file is not a valid Count//Down backup (schema version 1 required).",
+          "This file is not a valid Count//Down backup (supported schema versions: 1–3).",
         );
       }
     };
@@ -71,8 +106,12 @@ export default function SettingsPage() {
       save({ notificationPermission: "unsupported" });
       return;
     }
+    if (Notification.permission !== "default") return;
     const permission = await Notification.requestPermission();
     save({ notificationPermission: permission });
+    setDiagnostics((current) =>
+      current ? { ...current, permission } : current,
+    );
   };
   return (
     <AppShell title="Settings">
@@ -102,21 +141,51 @@ export default function SettingsPage() {
         <PixelCard>
           <h2>Notifications</h2>
           <p>
-            Permission: <b>{settings.notificationPermission}</b>
+            Status:{" "}
+            <b>{diagnostics ? notificationStatus(diagnostics) : "Checking…"}</b>
           </p>
           <p className="muted">
-            Browsers and iOS may limit notification delivery. We only ask when
-            you choose.
+            This app currently checks browser permission only. Push delivery and
+            a backend subscription are not configured.
           </p>
           <PixelButton
             onClick={request}
             disabled={
-              settings.notificationPermission === "denied" ||
-              settings.notificationPermission === "granted"
+              !diagnostics ||
+              !canRequestNotificationPermission(diagnostics.permission)
             }
           >
-            Request permission
+            {diagnostics?.permission === "denied"
+              ? "Open instructions below"
+              : "Request permission"}
           </PixelButton>
+          <details className="notification-help">
+            <summary>Setup instructions</summary>
+            <p>
+              On iPhone, add the app to the Home Screen and open it from its
+              icon. Notifications require a secure HTTPS origin. If denied, open
+              iPhone Settings → Notifications and select this app if listed.
+            </p>
+          </details>
+          {process.env.NODE_ENV === "development" && diagnostics && (
+            <details className="notification-diagnostics">
+              <summary>Diagnostic details</summary>
+              <dl>
+                <dt>Secure context</dt>
+                <dd>{String(diagnostics.secure)}</dd>
+                <dt>Standalone</dt>
+                <dd>{String(diagnostics.standalone)}</dd>
+                <dt>Notification API</dt>
+                <dd>{String(diagnostics.notification)}</dd>
+                <dt>Service worker</dt>
+                <dd>{String(diagnostics.serviceWorker)}</dd>
+                <dt>PushManager</dt>
+                <dd>{String(diagnostics.pushManager)}</dd>
+                <dt>Permission</dt>
+                <dd>{diagnostics.permission}</dd>
+              </dl>
+            </details>
+          )}
         </PixelCard>
         <PixelCard>
           <h2>Appearance</h2>
@@ -133,17 +202,36 @@ export default function SettingsPage() {
                   onChange={() => save({ theme })}
                 />
                 <ThemePreview theme={theme} />
-                <span>
-                  {theme
-                    .replace("retro-", "Retro ")
-                    .replace("system", "System")}
-                </span>
+                <span>{themeNames[theme]}</span>
               </label>
             ))}
           </div>
         </PixelCard>
         <PixelCard>
           <h2>Data management</h2>
+          <dl className="storage-stats">
+            <dt>Storage</dt>
+            <dd>Browser localStorage (this device and origin)</dd>
+            <dt>Countdowns</dt>
+            <dd>{countdownRepository.list().length}</dd>
+            <dt>Categories</dt>
+            <dd>{categoryRepository.list().length}</dd>
+            <dt>Last backup</dt>
+            <dd>
+              {settings.lastBackupAt
+                ? new Date(settings.lastBackupAt).toLocaleString()
+                : "No backup recorded"}
+            </dd>
+          </dl>
+          <p className="storage-warning">
+            ข้อมูลถูกเก็บไว้ภายในเบราว์เซอร์ของอุปกรณ์นี้ การลบข้อมูลเว็บไซต์
+            ลบแอป PWA หรือเปลี่ยน URL อาจทำให้ข้อมูลไม่ปรากฏ
+            กรุณาสำรองข้อมูลเป็นระยะ
+          </p>
+          <p className="muted">
+            Data does not sync across devices or between localhost, a
+            local-network IP, and a production domain.
+          </p>
           <p>
             Export a safe JSON backup, or validate a backup before restoring it.
           </p>
