@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { ChevronDown, Plus, Repeat2, X } from "lucide-react";
+import { ChevronDown, Repeat2 } from "lucide-react";
 import { AppShell } from "./shell";
 import { FormField, PixelButton, PixelCard } from "./ui";
 import {
@@ -19,6 +19,8 @@ import type {
 import { disabledRecurrence, validateRecurrenceRule } from "@/lib/recurrence";
 import { parseLocalDateParam } from "@/lib/calendar";
 import { CategoryIcon } from "@/lib/icons";
+import { ReminderSelector } from "./reminder-selector";
+import { normalizeReminderDays } from "@/lib/reminders";
 const repeats: RepeatType[] = [
   "never",
   "daily",
@@ -27,9 +29,6 @@ const repeats: RepeatType[] = [
   "yearly",
   "custom",
 ];
-const quickReminders = [0, 1];
-const labelForReminder = (days: number) =>
-  days === 0 ? "Same day" : `${days} day${days === 1 ? "" : "s"} before`;
 type FormMode = "page" | "modal";
 export function CountdownForm({
   existing,
@@ -48,8 +47,6 @@ export function CountdownForm({
   const [categories, setCategories] = useState<Category[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [showCustom, setShowCustom] = useState(false);
-  const [customReminder, setCustomReminder] = useState("");
   const [categoryOpen, setCategoryOpen] = useState(false);
   const initial = useMemo(
     () =>
@@ -62,7 +59,7 @@ export function CountdownForm({
         ),
         allDay: true,
         categoryId: "personal",
-        reminderDays: [7, 1],
+        reminderDays: [1],
         repeat: "never" as RepeatType,
         recurrence: disabledRecurrence,
         important: false,
@@ -81,30 +78,7 @@ export function CountdownForm({
   }, [existing]);
   const change = (key: keyof typeof form, value: string | boolean | number[]) =>
     setForm((current) => ({ ...current, [key]: value }));
-  const reminders = Array.from(new Set(form.reminderDays))
-    .filter((value) => Number.isInteger(value) && value >= 0)
-    .sort((a, b) => a - b);
-  const toggleReminder = (days: number) =>
-    change(
-      "reminderDays",
-      reminders.includes(days)
-        ? reminders.filter((value) => value !== days)
-        : [...reminders, days],
-    );
-  const addCustom = () => {
-    const days = Number(customReminder);
-    if (!Number.isInteger(days) || days < 0 || days > 3650) {
-      setError("Custom reminder must be a whole number from 0 to 3650 days.");
-      return;
-    }
-    change(
-      "reminderDays",
-      reminders.includes(days) ? reminders : [...reminders, days],
-    );
-    setCustomReminder("");
-    setShowCustom(false);
-    setError("");
-  };
+  const reminders = normalizeReminderDays(form.reminderDays);
   const repeatChoice = !form.recurrence.enabled
     ? "never"
     : form.repeat === "custom" || form.recurrence.interval !== 1
@@ -170,17 +144,23 @@ export function CountdownForm({
     const due = form.allDay
       ? `${form.dueAt.slice(0, 10)}T12:00:00`
       : form.dueAt;
-    const saved = countdownRepository.save(
-      {
-        ...form,
-        title: form.title.trim(),
-        reminderDays: reminders,
-        dueAt: new Date(due).toISOString(),
-      } as CountdownInput,
-      existing?.id,
-    );
-    if (onSaved) onSaved(saved);
-    else router.push(`/countdowns/${saved.id}`);
+    try {
+      const saved = countdownRepository.save(
+        {
+          ...form,
+          title: form.title.trim(),
+          reminderDays: reminders,
+          dueDate: form.allDay ? form.dueAt.slice(0, 10) : undefined,
+          dueAt: new Date(due).toISOString(),
+        } as CountdownInput,
+        existing?.id,
+      );
+      if (onSaved) onSaved(saved);
+      else router.push(`/countdowns/${saved.id}`);
+    } catch {
+      setError("Could not save this countdown. Please try again.");
+      setBusy(false);
+    }
   };
   const content = (
     <form onSubmit={submit} className={`form-layout form-${mode}`}>
@@ -298,70 +278,10 @@ export function CountdownForm({
               )}
             </div>
           </div>
-          <div className="field reminder-field">
-            <span>Reminder days before</span>
-            <div
-              className="reminder-chips"
-              role="group"
-              aria-label="Quick reminder days"
-            >
-              {quickReminders.map((days) => (
-                <button
-                  type="button"
-                  key={days}
-                  aria-pressed={reminders.includes(days)}
-                  className={reminders.includes(days) ? "selected" : ""}
-                  onClick={() => toggleReminder(days)}
-                >
-                  {reminders.includes(days) && (
-                    <X size={14} aria-hidden="true" />
-                  )}
-                  {labelForReminder(days)}
-                </button>
-              ))}
-              <button
-                type="button"
-                className="custom-reminder-trigger"
-                onClick={() => setShowCustom((open) => !open)}
-              >
-                <Plus size={16} aria-hidden="true" />
-                Custom
-              </button>
-            </div>
-            {showCustom && (
-              <div className="custom-reminder">
-                <input
-                  aria-label="Custom reminder days"
-                  type="number"
-                  inputMode="numeric"
-                  min="0"
-                  max="3650"
-                  step="1"
-                  value={customReminder}
-                  onChange={(e) => setCustomReminder(e.target.value)}
-                  placeholder="Days"
-                />
-                <PixelButton type="button" onClick={addCustom}>
-                  Add
-                </PixelButton>
-              </div>
-            )}
-            <div className="chosen-reminders">
-              {reminders
-                .filter((days) => !quickReminders.includes(days))
-                .map((days) => (
-                  <button
-                    type="button"
-                    key={days}
-                    onClick={() => toggleReminder(days)}
-                    aria-label={`Remove ${labelForReminder(days)}`}
-                  >
-                    <X size={14} aria-hidden="true" />
-                    {labelForReminder(days)}
-                  </button>
-                ))}
-            </div>
-          </div>
+          <ReminderSelector
+            value={reminders}
+            onChange={(reminderDays) => change("reminderDays", reminderDays)}
+          />
           <FormField label="Repeat">
             <select
               id="repeat"
