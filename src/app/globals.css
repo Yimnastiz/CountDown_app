@@ -1214,12 +1214,20 @@ body.modal-open {
     flex: 0 0 auto;
   }
   .sidebar-toggle.icon-button {
-    min-width: 44px;
-    min-height: 44px;
-    border: 0;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    min-height: 40px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 4px;
     background: transparent;
     box-shadow: none;
     color: var(--fg-muted);
+    transition:
+      color 140ms ease,
+      background-color 140ms ease,
+      transform 140ms ease;
   }
   .sidebar-toggle.icon-button:hover {
     background: var(--muted);
@@ -1242,6 +1250,8 @@ body.modal-open {
   }
   .sidebar-collapsed .sidebar-top {
     flex-direction: column;
+    gap: 10px;
+    align-items: center;
   }
   .sidebar-collapsed .sidebar-nav a {
     justify-content: center;

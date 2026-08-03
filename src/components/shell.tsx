@@ -197,6 +197,7 @@ export function AppShell({
             aria-label={
               mode === "expanded" ? "Collapse sidebar" : "Expand sidebar"
             }
+            title={mode === "expanded" ? "Collapse sidebar" : "Expand sidebar"}
             aria-expanded={mode === "expanded"}
             onClick={() =>
               updateMode(mode === "expanded" ? "collapsed" : "expanded")
