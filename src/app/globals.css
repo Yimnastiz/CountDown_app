@@ -139,12 +139,33 @@ h1,
 h2,
 h3,
 .brand,
-.eyebrow,
 .summary-number,
 .hero-number,
 .detail-number {
-  font-family: var(--font-display), var(--font-body), monospace;
-  letter-spacing: -0.04em;
+  font-family:
+    var(--font-pixellet), "Noto Sans Thai", var(--font-body), system-ui,
+    sans-serif;
+  letter-spacing: 0.01em;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+.font-pixel {
+  font-family:
+    var(--font-pixellet), "Noto Sans Thai", var(--font-body), system-ui,
+    sans-serif;
+  letter-spacing: 0.01em;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+.pixel-button,
+.month-year-button,
+.dialog h2,
+.countdown-card strong {
+  font-family:
+    var(--font-pixellet), "Noto Sans Thai", var(--font-body), system-ui,
+    sans-serif;
 }
 h1,
 h2,

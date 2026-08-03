@@ -1,17 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Chakra_Petch, Silkscreen } from "next/font/google";
+import { Chakra_Petch } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegistration } from "@/components/service-worker";
+import { pixellet } from "@/lib/fonts";
 const bodyFont = Chakra_Petch({
   subsets: ["latin", "thai"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-body",
-  display: "swap",
-});
-const displayFont = Silkscreen({
-  subsets: ["latin"],
-  weight: ["400", "700"],
-  variable: "--font-display",
   display: "swap",
 });
 export const metadata: Metadata = {
@@ -46,7 +41,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${bodyFont.variable} ${displayFont.variable}`}>
+      <body className={`${bodyFont.variable} ${pixellet.variable}`}>
         <ServiceWorkerRegistration />
         {children}
       </body>
