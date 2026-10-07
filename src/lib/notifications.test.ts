@@ -17,4 +17,19 @@ describe("notifications", () => {
         permission: "default",
       }),
     ).toBe("Requires HTTPS"));
+  it("distinguishes permission from an active subscription", () => {
+    const base = {
+      secure: true,
+      standalone: true,
+      notification: true,
+      serviceWorker: true,
+      pushManager: true,
+      permission: "granted" as const,
+      vapidConfigured: true,
+    };
+    expect(notificationStatus(base)).toBe("Ready to subscribe");
+    expect(notificationStatus({ ...base, subscribed: true })).toBe(
+      "Subscribed",
+    );
+  });
 });

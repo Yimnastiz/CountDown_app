@@ -12,10 +12,14 @@ import { backupService, settingsRepository } from "@/lib/repository";
 import { ReminderSelector } from "@/components/reminder-selector";
 import { categoryRepository, countdownRepository } from "@/lib/repository";
 import {
-  canRequestNotificationPermission,
+  getNotificationDiagnostics,
   notificationStatus,
   type NotificationDiagnostics,
 } from "@/lib/notifications";
+import {
+  getCurrentPushSubscription,
+  subscribeToPush,
+} from "@/lib/push-subscription";
 import type { AppSettings, BackupFile } from "@/lib/types";
 const themes: AppSettings["theme"][] = [
   "system",
@@ -43,21 +47,15 @@ export default function SettingsPage() {
   const [importMode, setImportMode] = useState<"merge" | "replace">("merge");
   const [diagnostics, setDiagnostics] =
     useState<NotificationDiagnostics | null>(null);
+  const [pushBusy, setPushBusy] = useState<"enabling" | "sending" | null>(null);
+  const [testStatus, setTestStatus] = useState("Not sent");
+  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
   useEffect(() => {
     setSettings(settingsRepository.get());
-    const notification = "Notification" in window;
-    const permission = notification ? Notification.permission : "unsupported";
-    setDiagnostics({
-      secure: window.isSecureContext,
-      standalone:
-        window.matchMedia("(display-mode: standalone)").matches ||
-        Boolean((navigator as Navigator & { standalone?: boolean }).standalone),
-      notification,
-      serviceWorker: "serviceWorker" in navigator,
-      pushManager: "PushManager" in window,
-      permission,
-    });
-  }, []);
+    void getNotificationDiagnostics(Boolean(vapidPublicKey)).then(
+      setDiagnostics,
+    );
+  }, [vapidPublicKey]);
   if (!settings) return null;
   const save = (updates: Partial<AppSettings>) => {
     const next = { ...settings, ...updates };
@@ -117,20 +115,59 @@ export default function SettingsPage() {
     };
     reader.readAsText(file);
   };
-  const request = async () => {
-    if (!("Notification" in window)) {
-      save({ notificationPermission: "unsupported" });
-      return;
-    }
-    if (Notification.permission !== "default") return;
+  const enablePush = async () => {
+    if (pushBusy) return;
+    setPushBusy("enabling");
+    setMessage("");
     try {
-      const permission = await Notification.requestPermission();
-      save({ notificationPermission: permission });
-      setDiagnostics((current) =>
-        current ? { ...current, permission } : current,
+      await subscribeToPush(vapidPublicKey);
+      save({ notificationPermission: Notification.permission });
+      setDiagnostics(await getNotificationDiagnostics(Boolean(vapidPublicKey)));
+      setMessage("Push notifications enabled on this device.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Push notifications could not be enabled.",
       );
-    } catch {
-      setMessage("Browser permission could not be checked. Please try again.");
+    } finally {
+      setPushBusy(null);
+    }
+  };
+  const sendTestPush = async () => {
+    if (pushBusy) return;
+    setPushBusy("sending");
+    setTestStatus("Sending...");
+    setMessage("");
+    try {
+      const subscription = await getCurrentPushSubscription();
+      if (!subscription)
+        throw new Error(
+          "No active push subscription was found. Enable push notifications again.",
+        );
+      const result = await fetch("/api/push/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription: subscription.toJSON() }),
+      });
+      const body = (await result.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      if (!result.ok)
+        throw new Error(
+          body.error ?? "The test notification could not be sent.",
+        );
+      setTestStatus("Test notification sent.");
+      setMessage("Test notification sent.");
+    } catch (error) {
+      setTestStatus("Error");
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "The test notification could not be sent.",
+      );
+    } finally {
+      setPushBusy(null);
     }
   };
   return (
@@ -166,21 +203,51 @@ export default function SettingsPage() {
             Status:{" "}
             <b>{diagnostics ? notificationStatus(diagnostics) : "Checking…"}</b>
           </p>
-          <p className="muted">
-            This app currently checks browser permission only. Push delivery and
-            a backend subscription are not configured.
-          </p>
-          <PixelButton
-            onClick={request}
-            disabled={
-              !diagnostics ||
-              !canRequestNotificationPermission(diagnostics.permission)
-            }
-          >
-            {diagnostics?.permission === "denied"
-              ? "Open instructions below"
-              : "Enable browser permission"}
-          </PixelButton>
+          <dl className="storage-stats">
+            <dt>Notification permission</dt>
+            <dd>{diagnostics?.permission ?? "Checking..."}</dd>
+            <dt>Push subscription</dt>
+            <dd>
+              {diagnostics
+                ? diagnostics.subscribed
+                  ? "Subscribed"
+                  : "Not subscribed"
+                : "Checking..."}
+            </dd>
+            <dt>Push delivery test</dt>
+            <dd>{testStatus}</dd>
+          </dl>
+          {diagnostics?.ios && !diagnostics.standalone && (
+            <p className="notice">
+              Install COUNT//DOWN to your Home Screen before enabling push
+              notifications.
+            </p>
+          )}
+          {!diagnostics?.subscribed && (
+            <PixelButton
+              onClick={enablePush}
+              disabled={
+                !diagnostics ||
+                pushBusy !== null ||
+                [
+                  "Unsupported",
+                  "Requires HTTPS",
+                  "Requires installation",
+                  "Denied",
+                  "Not configured",
+                ].includes(notificationStatus(diagnostics))
+              }
+            >
+              {pushBusy === "enabling"
+                ? "Enabling..."
+                : "Enable push notifications"}
+            </PixelButton>
+          )}
+          {diagnostics?.subscribed && (
+            <PixelButton onClick={sendTestPush} disabled={pushBusy !== null}>
+              {pushBusy === "sending" ? "Sending..." : "Send test notification"}
+            </PixelButton>
+          )}
           <details className="notification-help">
             <summary>Setup instructions</summary>
             <p>
