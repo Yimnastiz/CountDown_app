@@ -7,3 +7,4 @@ out/
 .env.*.local
 !.env.example
 *.tsbuildinfo
+countdown_app_*.zip

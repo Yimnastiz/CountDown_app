@@ -320,6 +320,17 @@ main {
   opacity: 0.5;
   cursor: not-allowed;
 }
+.auth-control {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  font-size: 0.78rem;
+}
+.auth-control > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .pixel-button.danger {
   background: var(--danger);
 }
@@ -1283,7 +1294,8 @@ body.modal-open {
   }
   .sidebar-collapsed .brand span,
   .sidebar-collapsed .sidebar > p,
-  .sidebar-collapsed .sidebar-nav a span {
+  .sidebar-collapsed .sidebar-nav a span,
+  .sidebar-collapsed .auth-control {
     display: none;
   }
   .sidebar-collapsed .brand {

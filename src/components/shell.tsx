@@ -20,6 +20,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { settingsRepository } from "@/lib/repository";
 import type { AppSettings } from "@/lib/types";
 import { normalizeSidebarMode } from "@/lib/sidebar";
+import { AuthControl } from "@/components/auth-control";
 const desktopNav = [
   { href: "/", label: "Dashboard", icon: House },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
@@ -123,6 +124,7 @@ function MobileNav() {
               <Settings aria-hidden="true" />
               Settings
             </Link>
+            <AuthControl />
           </section>
         </div>
       )}
@@ -212,6 +214,7 @@ export function AppShell({
         </div>
         <p>Important days, clearly.</p>
         <DesktopNav mode={mode} />
+        <AuthControl />
       </aside>
       {mode === "hidden" && (
         <button

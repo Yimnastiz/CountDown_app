@@ -89,6 +89,14 @@ export interface ReminderSchedule {
   scheduledFor: string;
   timezone: string;
 }
+/** Cloud account installation metadata. Countdown data remains local in STEP 3. */
+export interface Device {
+  id: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+  lastSeenAt: string;
+}
 export interface BackupFile {
   schemaVersion: number;
   exportedAt: string;
