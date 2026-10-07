@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { AppShell } from "@/components/shell";
 import {
   ConfirmDialog,
@@ -7,22 +7,20 @@ import {
   EmptyState,
   PixelButton,
 } from "@/components/ui";
-import { categoryRepository, countdownRepository } from "@/lib/repository";
+import { useAppData } from "@/components/app-data";
 import { byDue } from "@/lib/date";
 import { getCompletedHistory, occurrenceDateFor } from "@/lib/occurrences";
-import type { Category, Countdown } from "@/lib/types";
 export default function HistoryPage() {
-  const [items, setItems] = useState<Countdown[]>([]);
-  const [cats, setCats] = useState<Category[]>([]);
+  const {
+    countdowns: items,
+    categories: cats,
+    clearCompletedHistory,
+  } = useAppData();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [order, setOrder] = useState("newest");
   const [clear, setClear] = useState(false);
-  const load = () => {
-    setItems(countdownRepository.list());
-    setCats(categoryRepository.list());
-  };
-  useEffect(load, []);
+  const [message, setMessage] = useState("");
   const results = useMemo(
     () =>
       getCompletedHistory(items)
@@ -36,6 +34,11 @@ export default function HistoryPage() {
   );
   return (
     <AppShell title="History">
+      {message && (
+        <p className="notice" role="status">
+          {message}
+        </p>
+      )}
       <div className="filters">
         <input
           aria-label="Search history"
@@ -98,9 +101,15 @@ export default function HistoryPage() {
         confirmText="Clear history"
         onClose={() => setClear(false)}
         onConfirm={() => {
-          countdownRepository.clearCompletedHistory();
-          load();
-          setClear(false);
+          void clearCompletedHistory()
+            .then(() => setClear(false))
+            .catch((error) =>
+              setMessage(
+                error instanceof Error
+                  ? error.message
+                  : "History could not be cleared.",
+              ),
+            );
         }}
       >
         This permanently deletes all completed and archived countdowns.

@@ -157,6 +157,13 @@ const normalizeCountdowns = (values: Countdown[]) => {
 };
 
 const rawCountdowns = () => read<Countdown[]>(keys.countdowns, []);
+/** True only when this browser has legacy records/settings to offer for migration. */
+export const hasLegacyLocalData = () =>
+  Boolean(
+    safeStorage()?.getItem(keys.countdowns) ||
+    safeStorage()?.getItem(keys.categories) ||
+    safeStorage()?.getItem(keys.settings),
+  );
 const rootFor = (id: string) => countdownRepository.get(id);
 const setException = (
   series: Countdown,

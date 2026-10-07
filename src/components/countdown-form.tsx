@@ -5,11 +5,7 @@ import { format } from "date-fns";
 import { ChevronDown, Repeat2 } from "lucide-react";
 import { AppShell } from "./shell";
 import { FormField, PixelButton, PixelCard } from "./ui";
-import {
-  categoryRepository,
-  countdownRepository,
-  settingsRepository,
-} from "@/lib/repository";
+import { useAppData } from "@/components/app-data";
 import type {
   Category,
   Countdown,
@@ -44,7 +40,7 @@ export function CountdownForm({
   onCancel?: () => void;
 }) {
   const router = useRouter();
-  const [categories, setCategories] = useState<Category[]>([]);
+  const { categories, settings, saveCountdown } = useAppData();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [categoryOpen, setCategoryOpen] = useState(false);
@@ -69,13 +65,12 @@ export function CountdownForm({
   );
   const [form, setForm] = useState(initial);
   useEffect(() => {
-    setCategories(categoryRepository.list());
     if (!existing)
       setForm((current) => ({
         ...current,
-        reminderDays: settingsRepository.get().defaultReminderDays,
+        reminderDays: settings.defaultReminderDays,
       }));
-  }, [existing]);
+  }, [existing, settings.defaultReminderDays]);
   const change = (key: keyof typeof form, value: string | boolean | number[]) =>
     setForm((current) => ({ ...current, [key]: value }));
   const reminders = normalizeReminderDays(form.reminderDays);
@@ -133,7 +128,7 @@ export function CountdownForm({
       },
     }));
   };
-  const submit = (event: React.FormEvent) => {
+  const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     const recurrenceError = validateRecurrenceRule(form.recurrence);
     if (!form.title.trim() || !form.dueAt || recurrenceError) {
@@ -145,7 +140,7 @@ export function CountdownForm({
       ? `${form.dueAt.slice(0, 10)}T12:00:00`
       : form.dueAt;
     try {
-      const saved = countdownRepository.save(
+      const saved = await saveCountdown(
         {
           ...form,
           title: form.title.trim(),

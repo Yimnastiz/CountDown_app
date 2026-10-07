@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Chakra_Petch } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegistration } from "@/components/service-worker";
+import { AppDataProvider } from "@/components/app-data";
 import { pixellet } from "@/lib/fonts";
 const bodyFont = Chakra_Petch({
   subsets: ["latin", "thai"],
@@ -43,7 +44,7 @@ export default function RootLayout({
       </head>
       <body className={`${bodyFont.variable} ${pixellet.variable}`}>
         <ServiceWorkerRegistration />
-        {children}
+        <AppDataProvider>{children}</AppDataProvider>
       </body>
     </html>
   );

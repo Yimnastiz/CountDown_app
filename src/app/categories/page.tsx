@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AppShell } from "@/components/shell";
 import {
   ConfirmDialog,
@@ -7,7 +7,7 @@ import {
   PixelButton,
   PixelCard,
 } from "@/components/ui";
-import { categoryRepository, countdownRepository } from "@/lib/repository";
+import { useAppData } from "@/components/app-data";
 import type { Category } from "@/lib/types";
 import { createId } from "@/lib/id";
 import {
@@ -25,28 +25,32 @@ const blank = (): Category => ({
   updatedAt: "",
 });
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const { categories, countdowns, saveCategory, removeCategory } = useAppData();
   const [editing, setEditing] = useState<Category | null>(null);
   const [remove, setRemove] = useState<Category | null>(null);
   const [iconSearch, setIconSearch] = useState("");
-  const load = () => setCategories(categoryRepository.list());
-  useEffect(load, []);
-  const save = (e: React.FormEvent) => {
+  const [message, setMessage] = useState("");
+  const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editing?.name.trim()) return;
     const now = new Date().toISOString();
-    categoryRepository.save({
-      ...editing,
-      id: editing.id || createId(),
-      name: editing.name.trim(),
-      createdAt: editing.createdAt || now,
-      updatedAt: now,
-    });
-    setEditing(null);
-    load();
+    try {
+      await saveCategory({
+        ...editing,
+        id: editing.id || createId(),
+        name: editing.name.trim(),
+        createdAt: editing.createdAt || now,
+        updatedAt: now,
+      });
+      setEditing(null);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Category could not be saved.",
+      );
+    }
   };
   const usage = (id: string) =>
-    countdownRepository.list().filter((x) => x.categoryId === id).length;
+    countdowns.filter((x) => x.categoryId === id).length;
   return (
     <AppShell
       title="Categories"
@@ -54,6 +58,11 @@ export default function CategoriesPage() {
         <PixelButton onClick={() => setEditing(blank())}>Add</PixelButton>
       }
     >
+      {message && (
+        <p className="notice" role="status">
+          {message}
+        </p>
+      )}
       {categories.length ? (
         <div className="category-list">
           {categories.map((c) => (
@@ -164,9 +173,15 @@ export default function CategoriesPage() {
         onClose={() => setRemove(null)}
         onConfirm={() => {
           if (remove) {
-            categoryRepository.remove(remove.id);
-            load();
-            setRemove(null);
+            void removeCategory(remove.id)
+              .then(() => setRemove(null))
+              .catch((error) =>
+                setMessage(
+                  error instanceof Error
+                    ? error.message
+                    : "Category could not be deleted.",
+                ),
+              );
           }
         }}
       >

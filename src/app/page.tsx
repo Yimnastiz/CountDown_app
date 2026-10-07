@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { addDays, subDays } from "date-fns";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -28,8 +28,8 @@ import {
   type DashboardFilters,
   DEFAULT_FILTER_PANEL_OPEN,
 } from "@/lib/filters";
-import { categoryRepository, countdownRepository } from "@/lib/repository";
-import type { Category, Countdown } from "@/lib/types";
+import { useAppData } from "@/components/app-data";
+import type { Countdown } from "@/lib/types";
 import { withVirtualOccurrences } from "@/lib/occurrences";
 import { occurrenceDateFor } from "@/lib/occurrences";
 const parseFilters = (params: URLSearchParams): DashboardFilters => ({
@@ -38,18 +38,12 @@ const parseFilters = (params: URLSearchParams): DashboardFilters => ({
     (params.get("importance") as DashboardFilters["importance"]) || "all",
 });
 function DashboardContent() {
-  const [items, setItems] = useState<Countdown[]>([]);
-  const [cats, setCats] = useState<Category[]>([]);
+  const { countdowns: items, categories: cats } = useAppData();
   const [filtersOpen, setFiltersOpen] = useState(DEFAULT_FILTER_PANEL_OPEN);
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const filters = parseFilters(params);
-  useEffect(() => {
-    countdownRepository.seed();
-    setItems(countdownRepository.list());
-    setCats(categoryRepository.list());
-  }, []);
   const setFilters = (next: DashboardFilters) => {
     const query = new URLSearchParams();
     if (next.categoryIds.length)

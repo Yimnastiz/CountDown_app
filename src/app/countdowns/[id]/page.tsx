@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -28,26 +28,28 @@ import {
   occurrenceDateFor,
   resolveOccurrence,
 } from "@/lib/occurrences";
-import { categoryRepository, countdownRepository } from "@/lib/repository";
+import { useAppData } from "@/components/app-data";
 import type { Category, Countdown, CountdownInput } from "@/lib/types";
 
 export default function Detail() {
   const { id } = useParams<{ id: string }>();
   const occurrence = useSearchParams().get("occurrence");
   const router = useRouter();
-  const [series, setSeries] = useState<Countdown | null | undefined>();
-  const [cats, setCats] = useState<Category[]>([]);
+  const {
+    countdowns,
+    categories: cats,
+    complete,
+    undoCompletion,
+    removeCountdown,
+    stopRepeating,
+    saveCountdown,
+  } = useAppData();
+  const series = countdowns.find((item) => item.id === id) ?? null;
   const [confirm, setConfirm] = useState(false);
   const [stopConfirm, setStopConfirm] = useState(false);
   const [notice, setNotice] = useState("");
   const [savingCompletion, setSavingCompletion] = useState(false);
 
-  useEffect(() => {
-    setSeries(countdownRepository.get(id) ?? null);
-    setCats(categoryRepository.list());
-  }, [id]);
-
-  if (series === undefined) return null;
   if (!series) {
     return <Missing title="Countdown not found" href="/" />;
   }
@@ -66,13 +68,12 @@ export default function Detail() {
     setSavingCompletion(true);
     try {
       if (undo) {
-        countdownRepository.undoCompletion(series.id, occurrence ?? undefined);
+        await undoCompletion(series.id, occurrence ?? undefined);
         setNotice("Completion undone. This occurrence is active again.");
       } else {
-        countdownRepository.complete(series.id, occurrence ?? undefined);
+        await complete(series.id, occurrence ?? undefined);
         setNotice("Marked as completed.");
       }
-      setSeries(countdownRepository.get(series.id) ?? null);
     } catch {
       setNotice("We could not save that change. Please try again.");
     } finally {
@@ -91,7 +92,7 @@ export default function Detail() {
       setNotice("Share was cancelled or unavailable.");
     }
   };
-  const duplicate = () => {
+  const duplicate = async () => {
     const {
       id: _id,
       status: _status,
@@ -107,12 +108,16 @@ export default function Detail() {
       isVirtualOccurrence: _isVirtualOccurrence,
       ...input
     } = series;
-    const copy = countdownRepository.save({
-      ...input,
-      title: `${series.title} (copy)`,
-      recurrenceExceptions: [],
-    } as CountdownInput);
-    router.push(`/countdowns/${copy.id}`);
+    try {
+      const copy = await saveCountdown({
+        ...input,
+        title: `${series.title} (copy)`,
+        recurrenceExceptions: [],
+      } as CountdownInput);
+      router.push(`/countdowns/${copy.id}`);
+    } catch {
+      setNotice("We could not duplicate this countdown. Please try again.");
+    }
   };
 
   return (
@@ -203,7 +208,7 @@ export default function Detail() {
           <Share2 size={17} aria-hidden="true" />
           Share / Copy
         </PixelButton>
-        <PixelButton onClick={duplicate}>
+        <PixelButton onClick={() => void duplicate()}>
           <Copy size={17} aria-hidden="true" />
           Duplicate
         </PixelButton>
@@ -225,8 +230,9 @@ export default function Detail() {
         confirmText="Delete"
         onClose={() => setConfirm(false)}
         onConfirm={() => {
-          countdownRepository.remove(id);
-          router.push("/");
+          void removeCountdown(id)
+            .then(() => router.push("/"))
+            .catch(() => setNotice("We could not delete this countdown."));
         }}
       >
         This will permanently remove <strong>{series.title}</strong>. You cannot
@@ -238,13 +244,12 @@ export default function Detail() {
         confirmText="Stop repeating"
         onClose={() => setStopConfirm(false)}
         onConfirm={() => {
-          countdownRepository.stopRepeating(
-            id,
-            occurrence ?? occurrenceDateFor(item),
-          );
-          setSeries(countdownRepository.get(id) ?? null);
-          setNotice("Repeating stopped. Past history was kept.");
-          setStopConfirm(false);
+          void stopRepeating(id, occurrence ?? occurrenceDateFor(item))
+            .then(() => {
+              setNotice("Repeating stopped. Past history was kept.");
+              setStopConfirm(false);
+            })
+            .catch(() => setNotice("We could not stop repeating."));
         }}
       >
         Past occurrences and completed history will remain. Future occurrences

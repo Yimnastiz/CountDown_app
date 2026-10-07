@@ -21,20 +21,19 @@ import {
   PixelButton,
   PixelCard,
 } from "@/components/ui";
-import { categoryRepository, countdownRepository } from "@/lib/repository";
+import { useAppData } from "@/components/app-data";
 import { sameDate, statusFor } from "@/lib/date";
 import {
   isWeekendDate,
   monthFromSelection,
   sortCalendarDayItems,
 } from "@/lib/calendar";
-import type { Category, Countdown } from "@/lib/types";
+import type { Countdown } from "@/lib/types";
 import { occurrenceDateFor, withVirtualOccurrences } from "@/lib/occurrences";
 export default function CalendarPage() {
   const [month, setMonth] = useState(new Date());
   const [selected, setSelected] = useState(new Date());
-  const [items, setItems] = useState<Countdown[]>([]);
-  const [cats, setCats] = useState<Category[]>([]);
+  const { countdowns: items, categories: cats } = useAppData();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
   const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
@@ -42,10 +41,6 @@ export default function CalendarPage() {
   const [feedback, setFeedback] = useState("");
   const addButton = useRef<HTMLButtonElement>(null);
   const formDialog = useRef<HTMLElement>(null);
-  useEffect(() => {
-    setItems(countdownRepository.list());
-    setCats(categoryRepository.list());
-  }, []);
   const days = useMemo(
     () =>
       eachDayOfInterval({
@@ -297,7 +292,6 @@ export default function CalendarPage() {
               prefillDate={format(selected, "yyyy-MM-dd")}
               onCancel={closeForm}
               onSaved={() => {
-                setItems(countdownRepository.list());
                 setFeedback("Countdown added to the calendar.");
                 closeForm();
               }}

@@ -8,9 +8,9 @@ import {
   PixelCard,
   ThemePreview,
 } from "@/components/ui";
-import { backupService, settingsRepository } from "@/lib/repository";
+import { backupService } from "@/lib/repository";
 import { ReminderSelector } from "@/components/reminder-selector";
-import { categoryRepository, countdownRepository } from "@/lib/repository";
+import { useAppData } from "@/components/app-data";
 import {
   getNotificationDiagnostics,
   notificationStatus,
@@ -40,7 +40,19 @@ const themeNames: Record<AppSettings["theme"], string> = {
   lavender: "Lavender Retro",
 };
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const {
+    settings,
+    countdowns,
+    categories,
+    source,
+    loading,
+    error: syncError,
+    migrationAvailable,
+    migrateLocalData,
+    saveSettings,
+    importBackup,
+    clearAll,
+  } = useAppData();
   const [message, setMessage] = useState("");
   const [clear, setClear] = useState(false);
   const [imported, setImported] = useState<BackupFile | null>(null);
@@ -51,35 +63,43 @@ export default function SettingsPage() {
   const [testStatus, setTestStatus] = useState("Not sent");
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
   useEffect(() => {
-    setSettings(settingsRepository.get());
     void getNotificationDiagnostics(Boolean(vapidPublicKey)).then(
       setDiagnostics,
     );
   }, [vapidPublicKey]);
-  if (!settings) return null;
-  const save = (updates: Partial<AppSettings>) => {
-    const next = { ...settings, ...updates };
-    setSettings(next);
-    settingsRepository.save(updates);
-    if (updates.theme) {
-      document.documentElement.dataset.theme =
-        updates.theme === "system" ? "" : updates.theme;
-      const colors: Partial<Record<AppSettings["theme"], string>> = {
-        "retro-green": "#283828",
-        "retro-light": "#dbe6dc",
-        "retro-dark": "#171d25",
-        "pastel-pink": "#f7e3e7",
-        "sky-blue": "#dceff5",
-        lavender: "#e9e2f4",
-      };
-      document
-        .querySelector('meta[name="theme-color"]')
-        ?.setAttribute("content", colors[updates.theme] ?? "#283828");
+  const save = async (updates: Partial<AppSettings>) => {
+    try {
+      await saveSettings(updates);
+      if (updates.theme) {
+        document.documentElement.dataset.theme =
+          updates.theme === "system" ? "" : updates.theme;
+        const colors: Partial<Record<AppSettings["theme"], string>> = {
+          "retro-green": "#283828",
+          "retro-light": "#dbe6dc",
+          "retro-dark": "#171d25",
+          "pastel-pink": "#f7e3e7",
+          "sky-blue": "#dceff5",
+          lavender: "#e9e2f4",
+        };
+        document
+          .querySelector('meta[name="theme-color"]')
+          ?.setAttribute("content", colors[updates.theme] ?? "#283828");
+      }
+      setMessage("Settings saved.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Settings could not be saved.",
+      );
     }
-    setMessage("Settings saved.");
   };
   const download = () => {
-    const file = backupService.make();
+    const file: BackupFile = {
+      schemaVersion: 4,
+      exportedAt: new Date().toISOString(),
+      countdowns,
+      categories,
+      settings,
+    };
     const url = URL.createObjectURL(
       new Blob([JSON.stringify(file, null, 2)], { type: "application/json" }),
     );
@@ -88,7 +108,7 @@ export default function SettingsPage() {
     a.download = `countdown-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    save({ lastBackupAt: file.exportedAt });
+    void save({ lastBackupAt: file.exportedAt });
   };
   const fileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -178,6 +198,46 @@ export default function SettingsPage() {
         </p>
       )}
       <div className="settings-stack">
+        {syncError && (
+          <p className="notice" role="status">
+            Cloud sync error: {syncError}
+          </p>
+        )}
+        {source === "cloud" && (
+          <p className="muted">
+            Cloud data is active for this signed-in account.
+          </p>
+        )}
+        {migrationAvailable && (
+          <PixelCard>
+            <h2>Local data found</h2>
+            <p>
+              This device has countdown data that has not been imported into
+              your account yet. Importing merges it safely; it never clears this
+              device&apos;s local data.
+            </p>
+            <PixelButton
+              disabled={loading}
+              onClick={() => {
+                void migrateLocalData()
+                  .then(({ imported, conflicts }) =>
+                    setMessage(
+                      `Imported ${imported} record${imported === 1 ? "" : "s"}${conflicts ? `; preserved ${conflicts} conflict${conflicts === 1 ? "" : "s"}` : ""}.`,
+                    ),
+                  )
+                  .catch((error) =>
+                    setMessage(
+                      error instanceof Error
+                        ? error.message
+                        : "Local data could not be imported.",
+                    ),
+                  );
+              }}
+            >
+              Import this device&apos;s local data
+            </PixelButton>
+          </PixelCard>
+        )}
         <PixelCard>
           <h2>Reminder</h2>
           <ReminderSelector
@@ -315,11 +375,15 @@ export default function SettingsPage() {
           <h2>Data management</h2>
           <dl className="storage-stats">
             <dt>Storage</dt>
-            <dd>Browser localStorage (this device and origin)</dd>
+            <dd>
+              {source === "cloud"
+                ? "Cloud account data + this device's browser preferences"
+                : "Browser localStorage (this device and origin)"}
+            </dd>
             <dt>Countdowns</dt>
-            <dd>{countdownRepository.list().length}</dd>
+            <dd>{countdowns.length}</dd>
             <dt>Categories</dt>
-            <dd>{categoryRepository.list().length}</dd>
+            <dd>{categories.length}</dd>
             <dt>Last backup</dt>
             <dd>
               {settings.lastBackupAt
@@ -327,14 +391,17 @@ export default function SettingsPage() {
                 : "No backup recorded"}
             </dd>
           </dl>
-          <p className="storage-warning">
-            ข้อมูลถูกเก็บไว้ภายในเบราว์เซอร์ของอุปกรณ์นี้ การลบข้อมูลเว็บไซต์
-            ลบแอป PWA หรือเปลี่ยน URL อาจทำให้ข้อมูลไม่ปรากฏ
-            กรุณาสำรองข้อมูลเป็นระยะ
-          </p>
+          {source !== "cloud" && (
+            <p className="storage-warning">
+              ข้อมูลถูกเก็บไว้ภายในเบราว์เซอร์ของอุปกรณ์นี้ การลบข้อมูลเว็บไซต์
+              ลบแอป PWA หรือเปลี่ยน URL อาจทำให้ข้อมูลไม่ปรากฏ
+              กรุณาสำรองข้อมูลเป็นระยะ
+            </p>
+          )}
           <p className="muted">
-            Data does not sync across devices or between localhost, a
-            local-network IP, and a production domain.
+            {source === "cloud"
+              ? "Countdowns, categories, and account preferences sync when you use the same Google account. Notifications and browser preferences stay on this device."
+              : "Data does not sync across devices or between localhost, a local-network IP, and a production domain."}
           </p>
           <p>
             Export a safe JSON backup, or validate a backup before restoring it.
@@ -354,8 +421,9 @@ export default function SettingsPage() {
         <PixelCard className="danger-zone">
           <h2>Danger zone</h2>
           <p>
-            Clear all local countdowns, categories, and settings. This cannot be
-            undone.
+            {source === "cloud"
+              ? "Clear all countdowns, categories, and cloud account settings. This cannot be undone."
+              : "Clear all local countdowns, categories, and settings. This cannot be undone."}
           </p>
           <PixelButton className="danger" onClick={() => setClear(true)}>
             Clear all data
@@ -369,11 +437,20 @@ export default function SettingsPage() {
         onClose={() => setImported(null)}
         onConfirm={() => {
           if (imported) {
-            backupService.restore(imported, importMode);
-            setMessage(
-              `${importMode === "merge" ? "Merged" : "Replaced with"} ${imported.countdowns.length} countdowns and ${imported.categories.length} categories.`,
-            );
-            setImported(null);
+            void importBackup(imported, importMode)
+              .then(() => {
+                setMessage(
+                  `${importMode === "merge" ? "Merged" : "Replaced with"} ${imported.countdowns.length} countdowns and ${imported.categories.length} categories.`,
+                );
+                setImported(null);
+              })
+              .catch((error) =>
+                setMessage(
+                  error instanceof Error
+                    ? error.message
+                    : "Backup could not be imported.",
+                ),
+              );
           }
         }}
       >
@@ -388,7 +465,9 @@ export default function SettingsPage() {
             }
           >
             <option value="merge">Merge with current data</option>
-            <option value="replace">Replace all current data</option>
+            <option value="replace" disabled={source === "cloud"}>
+              Replace all current data
+            </option>
           </select>
         </label>
       </ConfirmDialog>
@@ -400,13 +479,23 @@ export default function SettingsPage() {
         confirmText="Clear all"
         onClose={() => setClear(false)}
         onConfirm={() => {
-          backupService.clear();
-          setClear(false);
-          location.assign("/");
+          void clearAll()
+            .then(() => {
+              setClear(false);
+              location.assign("/");
+            })
+            .catch((error) =>
+              setMessage(
+                error instanceof Error
+                  ? error.message
+                  : "Data could not be cleared.",
+              ),
+            );
         }}
       >
-        Type CLEAR to permanently remove all local data. Default categories will
-        return when the app is next opened.
+        {source === "cloud"
+          ? "Type CLEAR to permanently remove this account's cloud data and this device's local data. Default categories will return when the app is next opened."
+          : "Type CLEAR to permanently remove all local data. Default categories will return when the app is next opened."}
       </ConfirmDialog>
     </AppShell>
   );
