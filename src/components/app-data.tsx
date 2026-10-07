@@ -154,13 +154,74 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     const { data: listener } = supabase.auth.onAuthStateChange(
       () => void refresh(),
     );
-    const onFocus = () => void refresh();
-    window.addEventListener("focus", onFocus);
+    let foregroundRefreshPending = false;
+    const refreshOnForeground = () => {
+      if (document.visibilityState === "hidden" || foregroundRefreshPending)
+        return;
+      foregroundRefreshPending = true;
+      queueMicrotask(() => {
+        foregroundRefreshPending = false;
+        void refresh();
+      });
+    };
+    window.addEventListener("focus", refreshOnForeground);
+    document.addEventListener("visibilitychange", refreshOnForeground);
     return () => {
       listener.subscription.unsubscribe();
-      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("focus", refreshOnForeground);
+      document.removeEventListener("visibilitychange", refreshOnForeground);
     };
   }, [refresh]);
+  useEffect(() => {
+    if (!hasSupabaseConfig() || source !== "cloud" || !user?.id) return;
+    const supabase = createSupabaseBrowserClient();
+    let refreshTimer: number | undefined;
+    const scheduleRefresh = () => {
+      if (refreshTimer) return;
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = undefined;
+        void refresh();
+      }, 200);
+    };
+    const userFilter = `user_id=eq.${user.id}`;
+    const channel = supabase
+      .channel(`countdown-data:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "countdowns",
+          filter: userFilter,
+        },
+        scheduleRefresh,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "categories",
+          filter: userFilter,
+        },
+        scheduleRefresh,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "user_settings",
+          filter: userFilter,
+        },
+        scheduleRefresh,
+      )
+      .subscribe();
+    return () => {
+      if (refreshTimer) window.clearTimeout(refreshTimer);
+      void supabase.removeChannel(channel);
+    };
+  }, [refresh, source, user?.id]);
   useEffect(() => {
     if (source !== "cloud") return;
     document.documentElement.dataset.theme =
