@@ -48,6 +48,17 @@ describe("countdown repository", () => {
     settingsRepository.save({ sidebarMode: "collapsed" });
     expect(settingsRepository.get().sidebarMode).toBe("collapsed");
   });
+  it("normalizes old settings without a reminder time to 09:00", () => {
+    values.set(
+      "countdown-app.settings",
+      JSON.stringify({
+        defaultReminderDays: [0],
+        theme: "system",
+        notificationPermission: "default",
+      }),
+    );
+    expect(settingsRepository.get().defaultReminderTime).toBe("09:00");
+  });
   it("creates a countdown when randomUUID is unavailable", () => {
     Object.defineProperty(globalThis, "crypto", {
       configurable: true,

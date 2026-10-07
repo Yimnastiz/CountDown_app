@@ -63,6 +63,8 @@ export interface Category {
 }
 export interface AppSettings {
   defaultReminderDays: number[];
+  /** 24-hour local time used for all-day reminder schedules. */
+  defaultReminderTime: string;
   theme:
     | "system"
     | "retro-green"
@@ -74,6 +76,18 @@ export interface AppSettings {
   notificationPermission: "default" | "granted" | "denied" | "unsupported";
   lastBackupAt?: string;
   sidebarMode?: "expanded" | "collapsed" | "hidden";
+}
+export interface ReminderSchedule {
+  key: string;
+  countdownId: string;
+  occurrenceKey: string;
+  title: string;
+  /** Calendar date of the countdown occurrence (YYYY-MM-DD). */
+  targetDate: string;
+  reminderDaysBefore: number;
+  /** ISO instant at which the reminder should be delivered. */
+  scheduledFor: string;
+  timezone: string;
 }
 export interface BackupFile {
   schemaVersion: number;

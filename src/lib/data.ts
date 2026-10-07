@@ -22,6 +22,7 @@ export const defaultCategories: Category[] = [
 }));
 export const defaultSettings: AppSettings = {
   defaultReminderDays: [7, 1],
+  defaultReminderTime: "09:00",
   theme: "system",
   notificationPermission: "default",
   sidebarMode: "expanded",

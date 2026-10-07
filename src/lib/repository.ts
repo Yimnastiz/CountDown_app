@@ -4,6 +4,7 @@ import { dueDateKey, getLocalDateKey, incompleteStatusFor } from "./date";
 import { createId } from "./id";
 import { normalizeCategory, sortCategories } from "./categories";
 import { disabledRecurrence, normalizeLegacyRepeatRule } from "./recurrence";
+import { isReminderTime, normalizeReminderTime } from "./reminders";
 import type {
   AppSettings,
   BackupFile,
@@ -350,9 +351,24 @@ export const countdownRepository = {
 };
 
 export const settingsRepository = {
-  get: () => ({ ...defaultSettings, ...read(keys.settings, defaultSettings) }),
-  save: (updates: Partial<AppSettings>) =>
-    write("settings", { ...settingsRepository.get(), ...updates }),
+  get: () => {
+    const settings = {
+      ...defaultSettings,
+      ...read(keys.settings, defaultSettings),
+    };
+    return {
+      ...settings,
+      defaultReminderTime: normalizeReminderTime(settings.defaultReminderTime),
+    };
+  },
+  save: (updates: Partial<AppSettings>) => {
+    if (
+      "defaultReminderTime" in updates &&
+      !isReminderTime(updates.defaultReminderTime)
+    )
+      return;
+    write("settings", { ...settingsRepository.get(), ...updates });
+  },
 };
 
 type ValidationResult =
@@ -461,7 +477,9 @@ const validateBackup = (value: unknown): ValidationResult => {
     !Array.isArray(settings.defaultReminderDays) ||
     settings.defaultReminderDays.some(
       (day) => !Number.isInteger(day) || day < 0 || day > 3650,
-    )
+    ) ||
+    (settings.defaultReminderTime !== undefined &&
+      !isReminderTime(settings.defaultReminderTime))
   )
     return { ok: false, error: "settings is invalid" };
   return { ok: true, data: value as unknown as BackupFile };

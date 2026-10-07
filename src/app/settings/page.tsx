@@ -111,7 +111,7 @@ export default function SettingsPage() {
         setImported(value);
       } catch {
         setMessage(
-          "This file is not a valid Count//Down backup (supported schema versions: 1–3).",
+          "This file is not a valid Count//Down backup (supported schema versions: 1–4).",
         );
       }
     };
@@ -148,6 +148,17 @@ export default function SettingsPage() {
             onChange={(defaultReminderDays) => save({ defaultReminderDays })}
             label="Default reminder days"
           />
+          <FormField label="Reminder time">
+            <input
+              type="time"
+              value={settings.defaultReminderTime}
+              onChange={(event) => {
+                const defaultReminderTime = event.target.value;
+                if (/^([01]\d|2[0-3]):[0-5]\d$/.test(defaultReminderTime))
+                  save({ defaultReminderTime });
+              }}
+            />
+          </FormField>
         </PixelCard>
         <PixelCard>
           <h2>Notifications</h2>
