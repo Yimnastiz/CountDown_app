@@ -20,6 +20,7 @@ import {
   getCurrentPushSubscription,
   subscribeToPush,
 } from "@/lib/push-subscription";
+import { persistPushSubscription } from "@/lib/push-subscription-persistence";
 import type { AppSettings, BackupFile } from "@/lib/types";
 const themes: AppSettings["theme"][] = [
   "system",
@@ -42,6 +43,7 @@ const themeNames: Record<AppSettings["theme"], string> = {
 export default function SettingsPage() {
   const {
     settings,
+    user,
     countdowns,
     categories,
     source,
@@ -61,12 +63,31 @@ export default function SettingsPage() {
     useState<NotificationDiagnostics | null>(null);
   const [pushBusy, setPushBusy] = useState<"enabling" | "sending" | null>(null);
   const [testStatus, setTestStatus] = useState("Not sent");
+  const [serverPushStatus, setServerPushStatus] = useState("Not registered");
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
+  const userId = user?.id;
+  const hasBrowserSubscription = diagnostics?.subscribed;
   useEffect(() => {
     void getNotificationDiagnostics(Boolean(vapidPublicKey)).then(
       setDiagnostics,
     );
   }, [vapidPublicKey]);
+  useEffect(() => {
+    if (!userId || hasBrowserSubscription === undefined) {
+      setServerPushStatus(userId ? "Checking..." : "Sign in to register");
+      return;
+    }
+    let active = true;
+    void getCurrentPushSubscription()
+      .then((subscription) =>
+        persistPushSubscription(userId, subscription?.toJSON() ?? null),
+      )
+      .then(() => active && setServerPushStatus("Registered for this device"))
+      .catch(() => active && setServerPushStatus("Registration pending"));
+    return () => {
+      active = false;
+    };
+  }, [hasBrowserSubscription, userId]);
   const save = async (updates: Partial<AppSettings>) => {
     try {
       await saveSettings(updates);
@@ -140,8 +161,12 @@ export default function SettingsPage() {
     setPushBusy("enabling");
     setMessage("");
     try {
-      await subscribeToPush(vapidPublicKey);
-      save({ notificationPermission: Notification.permission });
+      const subscription = await subscribeToPush(vapidPublicKey);
+      await save({ notificationPermission: Notification.permission });
+      if (user) {
+        await persistPushSubscription(user.id, subscription.toJSON());
+        setServerPushStatus("Registered for this device");
+      }
       setDiagnostics(await getNotificationDiagnostics(Boolean(vapidPublicKey)));
       setMessage("Push notifications enabled on this device.");
     } catch (error) {
@@ -276,6 +301,8 @@ export default function SettingsPage() {
             </dd>
             <dt>Push delivery test</dt>
             <dd>{testStatus}</dd>
+            <dt>Server registration</dt>
+            <dd>{serverPushStatus}</dd>
           </dl>
           {diagnostics?.ios && !diagnostics.standalone && (
             <p className="notice">

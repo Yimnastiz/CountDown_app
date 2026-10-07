@@ -25,6 +25,8 @@ import { dueDateKey, getLocalDateKey, incompleteStatusFor } from "@/lib/date";
 import { normalizeCategory } from "@/lib/categories";
 import { normalizeLegacyRepeatRule } from "@/lib/recurrence";
 import { defaultCategories } from "@/lib/data";
+import { syncReminderJobs } from "@/lib/reminder-job-sync";
+import { getBrowserTimeZone } from "@/lib/timezone";
 import type {
   AppSettings,
   BackupFile,
@@ -222,6 +224,19 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       void supabase.removeChannel(channel);
     };
   }, [refresh, source, user?.id]);
+  useEffect(() => {
+    if (source !== "cloud" || !user?.id) return;
+    const timer = window.setTimeout(() => {
+      void syncReminderJobs(getBrowserTimeZone()).catch((cause) =>
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "Reminder jobs could not be synchronized.",
+        ),
+      );
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [data.countdowns, data.settings.defaultReminderTime, source, user?.id]);
   useEffect(() => {
     if (source !== "cloud") return;
     document.documentElement.dataset.theme =

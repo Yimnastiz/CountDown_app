@@ -1,11 +1,18 @@
 /** Returns the browser's IANA zone, with UTC as a safe portable fallback. */
+export function isValidTimeZone(value: unknown): value is string {
+  if (typeof value !== "string" || !value) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function getBrowserTimeZone(): string {
   try {
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (timeZone) {
-      new Intl.DateTimeFormat("en-US", { timeZone }).format();
-      return timeZone;
-    }
+    if (isValidTimeZone(timeZone)) return timeZone;
   } catch {
     // Some privacy-focused browsers can omit or reject the zone.
   }
