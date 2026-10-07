@@ -15,7 +15,7 @@ export type ReminderJobDraft = Pick<
   | "reminderDaysBefore"
   | "scheduledFor"
   | "timezone"
->;
+> & { isRecurring: boolean };
 
 export function buildReminderJobDrafts({
   countdowns,
@@ -35,5 +35,12 @@ export function buildReminderJobDrafts({
     reminderTime,
     timezone,
   });
-  return schedules.filter((schedule) => new Date(schedule.scheduledFor) >= now);
+  return schedules
+    .filter((schedule) => new Date(schedule.scheduledFor) >= now)
+    .map((schedule) => ({
+      ...schedule,
+      isRecurring:
+        countdowns.find((item) => item.id === schedule.countdownId)?.recurrence
+          .enabled ?? false,
+    }));
 }

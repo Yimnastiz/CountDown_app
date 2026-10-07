@@ -55,11 +55,14 @@ export async function POST(request: Request) {
     );
     const desiredKeys = new Set(drafts.map((job) => job.key));
     const cancelled = (existing.data ?? []).filter(
-      (job) => job.status === "pending" && !desiredKeys.has(job.schedule_key),
+      (job) =>
+        (job.status === "pending" || job.status === "processing") &&
+        !desiredKeys.has(job.schedule_key),
     );
-    const toSave = drafts.filter(
-      (job) => current.get(job.key)?.status !== "sent",
-    );
+    const toSave = drafts.filter((job) => {
+      const status = current.get(job.key)?.status;
+      return status !== "sent" && status !== "processing";
+    });
     const now = new Date().toISOString();
     const [cancelledResults, saved] = await Promise.all([
       Promise.all(
@@ -83,6 +86,7 @@ export async function POST(request: Request) {
               reminder_days_before: job.reminderDaysBefore,
               scheduled_for: job.scheduledFor,
               timezone: job.timezone,
+              is_recurring: job.isRecurring,
               status: "pending",
               cancelled_at: null,
             })),
